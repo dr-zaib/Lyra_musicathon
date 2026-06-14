@@ -1,0 +1,15 @@
+Pitch — versione breve (se il campo è corto)
+
+Lyra — the lyrics-first music agent.
+
+Music discovery today ignores what songs actually say. Lyra is an agentic system that reads the meaning inside lyrics — themes, emotion, narrative — and recommends music in real time based on the mood and intent of your current session, not just your listening history. It doesn't hand you a playlist: it reasons with you, explaining each pick by citing the actual lines that connect to how you feel. Built on Musixmatch's lyrics, mood and richsync data, with an extensible "learn" mode that turns the same engine into a personal songwriting tutor.
+
+
+Pitch — versione estesa (se c'è spazio)
+
+Lyra — the lyrics-first music agent.
+The problem. Every recommender — Spotify, Apple Music — treats lyrics as metadata or ignores them entirely. Yet lyrics carry the meaning we actually connect to: the themes, the emotion, the story. The richest signal in music is the most underused.
+The idea. Lyra is an agentic system that puts lyrics first. It understands the semantic and emotional content of songs and recommends music in real time, reasoning over the context of your current session — your mood, the moment, where you want to go next — instead of just mining your past behavior. Crucially, Lyra doesn't just output a list: it's an agent that explains why, citing specific lines, and adapts as you react. Want to stay in the melancholic bubble or break out of it? Lyra gets it.
+Why Musixmatch. This only works on top of the world's largest lyrics dataset. We use lyrics, mood, themes and richsync (word-level synced lyrics) as first-class features — the core of the product, not decoration.
+Beyond discovery. The same lyrics-understanding engine powers a second mode: a personal songwriting tutor that builds an adaptive learning path ("learn to write jazz lyrics in two weeks"), curating real examples and evolving with your feedback. One engine, two products: discover and learn.
+Team. Two Music & Acoustic Engineers (Politecnico di Milano) — one specialized in real-time audio AI agents, one a production data scientist in ML systems and signal processing.
