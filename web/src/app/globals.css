@@ -89,14 +89,22 @@ body::before {
 .emotion-node .dot {
   transition: r 0.18s ease, opacity 0.18s ease;
 }
+.emotion-node .halo {
+  opacity: 0;
+  transition: opacity 0.2s ease, r 0.2s ease;
+}
 .emotion-node text {
-  transition: fill 0.18s ease, opacity 0.18s ease;
+  transition: fill 0.18s ease, opacity 0.18s ease, font-size 0.18s ease;
 }
 .emotion-node:hover .dot {
-  r: 3.6;
+  r: 4.4;
   opacity: 1;
+}
+.emotion-node:hover .halo {
+  opacity: 0.28;
 }
 .emotion-node:hover text {
   fill: var(--fg);
   opacity: 1;
+  font-size: 3.1px;
 }

@@ -1,5 +1,5 @@
-import SessionView from "@/components/SessionView";
+import SplitView from "@/components/SplitView";
 
 export default function Home() {
-  return <SessionView />;
+  return <SplitView />;
 }

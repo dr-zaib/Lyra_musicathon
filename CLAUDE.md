@@ -94,3 +94,12 @@ Young framework (v0.x) → keep it in a **low-risk role**:
 ## Open TODOs (design)
 - Palette: decide whether to keep the violet aesthetic or move it closer to Musixmatch's brand (adapt, not clone).
 - Session screen viz: rework the second-screen visualization — leaning toward a graph style, but the current one is standard and can be improved a lot.
+
+## UX architecture (locked 2026-06-16)
+- **Split ~50/50**: left = animated emotional wheel (circumplex), right = agent conversation. The wheel is the persistent emotional map; the agent is the persistent spine.
+- **Landing**: single large wheel + a "describe your mood" composer (text to the agent is the primary input; clicking a node is the quick alternative). On start, the wheel **docks to the left** (morph) and the agent panel slides in.
+- **Path lives inside the conversation**: each track is a card in the agent thread (no separate path view). Player = persistent bottom bar (synced verse, auto-advance).
+- **Wheel in session = interactive map**: click an emotion to tell the agent "take me there".
+- **Comprehension bar** (bottom of the agent panel): the % is the **agent's own confidence** (the LLM returns `confidence` 0–1), NOT a turn counter. As confidence rises, the wheel collapses from a multi-emotion **cloud → a single sharp point**. It **never gates** — you can always proceed.
+- **→ Agent contract addition (for Axel)**: the agent / `/recommend` response should include `confidence: float (0..1)` and the emotion `distribution`, so the frontend can drive the comprehension bar + wheel reaction.
+- Animation reference: see the chat prototypes (v4 wheel morph + split). Real impl uses Motion; can be pushed further (orbit-out, particles) later.
