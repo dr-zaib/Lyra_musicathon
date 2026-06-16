@@ -71,7 +71,9 @@ const SESSIONS = new Map<string, State>();
 // Shape the running state into a contract turn. Intent distribution is normalized so
 // sum(weights) + shuffle === 1; `shuffle` is the neutral/serendipity remainder.
 function toTurn(s: State, message: string, trajectory: Trajectory | null = null): AgentTurn {
-  const shuffle = Math.round((1 - s.confidence) * 0.6 * 100) / 100;
+  // confidence is the committed fraction of intent; the rest is serendipity (shuffle).
+  // No interaction (confidence 0) → shuffle 1 (pure surprise). They always sum to 1.
+  const shuffle = Math.round((1 - s.confidence) * 100) / 100;
   const total = Object.values(s.weights).reduce((a, b) => a + (b ?? 0), 0) || 1;
   const scale = (1 - shuffle) / total;
   const weights: Weights = {};
