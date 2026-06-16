@@ -82,6 +82,22 @@ body::before {
   animation: fade-up 0.4s ease both;
 }
 
+/* living-background wheel: slow breathing */
+@keyframes lyra-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+.lyra-breathe {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lyra-breathe 7s ease-in-out infinite;
+}
+
 /* interactive emotion nodes on the landing wheel */
 .emotion-node {
   cursor: pointer;
