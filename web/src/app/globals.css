@@ -82,44 +82,21 @@ body::before {
   animation: fade-up 0.4s ease both;
 }
 
-/* rotating landing wheel: the group orbits clockwise, labels counter-rotate
-   about their own center so they stay upright. */
-@keyframes wheel-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes wheel-spin-rev {
-  to {
-    transform: rotate(-360deg);
-  }
-}
-.wheel-orbit {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: wheel-spin 90s linear infinite;
-}
-.wheel-label {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: wheel-spin-rev 90s linear infinite;
-}
-.wheel-comet {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: wheel-spin 16s linear infinite;
-}
-
 /* interactive emotion nodes on the landing wheel */
 .emotion-node {
   cursor: pointer;
 }
 .emotion-node .dot {
-  transition: r 0.15s ease;
+  transition: r 0.18s ease, opacity 0.18s ease;
+}
+.emotion-node text {
+  transition: fill 0.18s ease, opacity 0.18s ease;
 }
 .emotion-node:hover .dot {
-  r: 3.2;
+  r: 3.6;
+  opacity: 1;
 }
 .emotion-node:hover text {
   fill: var(--fg);
+  opacity: 1;
 }
