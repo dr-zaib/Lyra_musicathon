@@ -48,6 +48,7 @@ export default function EmotionWheel({
   onSelect?: (m: MacroNode) => void;
 }) {
   const [hovered, setHovered] = useState<MacroNode | null>(null);
+  const [focused, setFocused] = useState<MacroNode | null>(null);
 
   // Tween the shape's distribution so it morphs (adapts) instead of jumping when a mood
   // is added. Plain rAF — reliable, unlike animating SVG points/d. Snaps for hidden tabs
@@ -114,7 +115,7 @@ export default function EmotionWheel({
 
   function nodeStyle(name: MacroNode): { op: number; r: number } {
     const w = disp?.[name] ?? 0;
-    if (hovered === name) return { op: 1, r: 3.2 };
+    if (hovered === name || focused === name) return { op: 1, r: 3.2 };
     if (currentEmotion === name) return { op: 1, r: 3 };
     if (w > 0.04) return { op: rd(Math.min(1, 0.55 + w * 0.6)), r: rd(2 + w * 1.6) };
     if (hovered) return { op: 0.12, r: 2 };
@@ -146,16 +147,25 @@ export default function EmotionWheel({
         const { op, r } = nodeStyle(name);
         const color = TAXONOMY[name].color;
         const anchor = lp.x > CX + 1 ? "start" : lp.x < CX - 1 ? "end" : "middle";
-        const active = (disp?.[name] ?? 0) > 0.04 || hovered === name || currentEmotion === name;
+        const active = (disp?.[name] ?? 0) > 0.04 || hovered === name || focused === name || currentEmotion === name;
         return (
           <g
             key={name}
-            style={{ cursor: "pointer" }}
+            role="button"
+            tabIndex={0}
+            aria-label={`steer toward ${name}`}
+            style={{ cursor: "pointer", outline: "none" }}
             onMouseEnter={() => setHovered(name)}
             onMouseLeave={() => setHovered(null)}
+            onFocus={() => setFocused(name)}
+            onBlur={() => setFocused(null)}
             onClick={() => onSelect?.(name)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect?.(name); } }}
           >
             <circle cx={p.x} cy={p.y} r={7} fill="transparent" />
+            {focused === name && (
+              <circle cx={p.x} cy={p.y} r={5.5} fill="none" stroke="var(--accent)" strokeWidth={0.6} opacity={0.9} />
+            )}
             <circle
               cx={p.x} cy={p.y} r={r} fill={color} opacity={op}
               style={{ transition: "r .4s cubic-bezier(.22,.9,.25,1), opacity .5s ease" }}

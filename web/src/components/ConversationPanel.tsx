@@ -71,7 +71,14 @@ export default function ConversationPanel({
           <span>how well lyra understands you</span>
           <span>{Math.round(comprehension * 100)}%</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-bg-elev-2">
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-bg-elev-2"
+          role="progressbar"
+          aria-label="how well lyra understands you"
+          aria-valuenow={Math.round(comprehension * 100)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
           <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.round(comprehension * 100)}%` }} />
         </div>
 
@@ -115,6 +122,7 @@ export default function ConversationPanel({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="describe your mood"
+            aria-label="describe your mood"
             className={`h-10 flex-1 rounded-xl border px-3 text-sm outline-none focus:border-accent ${
               floating ? "border-white/15 bg-white/[0.06] backdrop-blur-sm" : "border-border bg-transparent"
             }`}
