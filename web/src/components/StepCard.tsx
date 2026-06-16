@@ -2,7 +2,10 @@
 
 // La card del passo corrente: copertina, brano, la spiegazione dell'agente e —
 // il cuore di Lyra — il verso citato che marca questo passaggio emotivo.
-// Il verso richsync è messo in evidenza, non sepolto in una lista.
+//
+// Il verso è reso "karaoke": le parole si illuminano in sequenza mentre l'audio
+// suona. È un PLACEHOLDER dell'esperienza richsync: con i timestamp word-level
+// veri (track.richsync.get) la sweep userà i tempi reali invece di un loop.
 
 import Image from "next/image";
 
@@ -20,16 +23,26 @@ export default function StepCard({
   step,
   index,
   total,
+  currentTime,
+  isPlaying,
 }: {
   step: TrajectoryStep;
   index: number;
   total: number;
+  currentTime: number;
+  isPlaying: boolean;
 }) {
   const t = step.selected_track;
   const dominant = Object.entries(step.target_distribution.weights).sort(
     (a, b) => (b[1] ?? 0) - (a[1] ?? 0),
   );
   const stamp = fmt(step.timestamp_in_song);
+
+  // karaoke: posizione 0..1 nel loop -> indice parola attiva
+  const words = step.citable_verse ? step.citable_verse.split(" ") : [];
+  const loopSec = Math.max(4, words.length * 0.5);
+  const pos = isPlaying ? (currentTime % loopSec) / loopSec : 1;
+  const activeIdx = Math.floor(pos * words.length);
 
   return (
     <div key={t.track_id} className="animate-fade-up">
@@ -63,7 +76,9 @@ export default function StepCard({
                 key={node}
                 className="rounded-full px-2 py-0.5 text-[11px]"
                 style={{
-                  background: (TAXONOMY[node as keyof typeof TAXONOMY]?.color ?? "#888") + "26",
+                  background:
+                    (TAXONOMY[node as keyof typeof TAXONOMY]?.color ?? "#888") +
+                    "26",
                   color: TAXONOMY[node as keyof typeof TAXONOMY]?.color ?? "#aaa",
                 }}
               >
@@ -79,7 +94,7 @@ export default function StepCard({
         {step.transition_reason}
       </p>
 
-      {/* il verso citato — il momento richsync */}
+      {/* il verso citato — il momento richsync, reso karaoke */}
       {step.citable_verse && (
         <figure className="mt-4 rounded-xl border border-accent/30 bg-accent/10 p-4">
           <div className="mb-1.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-accent/80">
@@ -90,8 +105,29 @@ export default function StepCard({
               </span>
             )}
           </div>
-          <blockquote className="text-lg italic text-fg">
-            “{step.citable_verse}”
+          <blockquote className="text-lg italic">
+            <span className="text-fg/40">“</span>
+            {words.map((w, i) => {
+              const passed = i < activeIdx;
+              const current = i === activeIdx && isPlaying;
+              return (
+                <span
+                  key={i}
+                  className={
+                    current
+                      ? "text-accent"
+                      : passed
+                        ? "text-fg"
+                        : "text-fg/35"
+                  }
+                  style={{ transition: "color 0.25s ease" }}
+                >
+                  {w}
+                  {i < words.length - 1 ? " " : ""}
+                </span>
+              );
+            })}
+            <span className="text-fg/40">”</span>
           </blockquote>
         </figure>
       )}

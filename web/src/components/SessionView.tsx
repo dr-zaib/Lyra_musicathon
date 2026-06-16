@@ -157,12 +157,22 @@ export default function SessionView() {
 
       <main className="mx-auto grid w-full max-w-6xl flex-1 gap-6 px-6 pb-6 lg:grid-cols-2">
         <div className="min-h-[340px] lg:min-h-0">
-          <EmotionalAtlas trajectory={trajectory} currentIndex={index} />
+          <EmotionalAtlas
+            trajectory={trajectory}
+            currentIndex={index}
+            onSelectStep={go}
+          />
         </div>
 
         <div className="flex flex-col gap-6">
           {currentStep && (
-            <StepCard step={currentStep} index={index} total={steps.length} />
+            <StepCard
+              step={currentStep}
+              index={index}
+              total={steps.length}
+              currentTime={currentTime}
+              isPlaying={isPlaying}
+            />
           )}
 
           <div className="rounded-2xl border border-border bg-bg-elev/40 p-2">

@@ -2,13 +2,14 @@
 
 // L'atlante emotivo: i 12 macro-nodi disposti su un piano valenza x intensità,
 // con la traiettoria tracciata come percorso e la posizione corrente che pulsa.
-// È il visual-hero del demo. Per ora SVG leggero; sostituibile con react-flow
-// in Fase 3 se serve interattività drag/zoom.
+// I nodi che compongono lo step corrente si accendono (anello) -> collega la
+// mappa alle percentuali mood nella StepCard. Waypoint cliccabili per saltare.
+// È il visual-hero del demo; sostituibile con react-flow se serve drag/zoom.
 
 import { useMemo } from "react";
 
 import { ALL_NODES, centroid } from "@/lib/taxonomy";
-import type { Trajectory } from "@/lib/types";
+import type { MacroNode, Trajectory } from "@/lib/types";
 
 const px = (x: number) => x * 100;
 const py = (y: number) => (1 - y) * 100; // intensità alta = in alto
@@ -16,9 +17,11 @@ const py = (y: number) => (1 - y) * 100; // intensità alta = in alto
 export default function EmotionalAtlas({
   trajectory,
   currentIndex,
+  onSelectStep,
 }: {
   trajectory: Trajectory | null;
   currentIndex: number;
+  onSelectStep?: (i: number) => void;
 }) {
   const points = useMemo(() => {
     if (!trajectory) return [];
@@ -34,6 +37,11 @@ export default function EmotionalAtlas({
   }, [points]);
 
   const current = points[currentIndex];
+
+  // nodi che compongono lo step corrente (per accenderli)
+  const activeNodes = new Set<MacroNode>(
+    Object.keys(trajectory?.steps[currentIndex]?.target_distribution.weights ?? {}) as MacroNode[],
+  );
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-bg-elev/60">
@@ -67,15 +75,34 @@ export default function EmotionalAtlas({
         {ALL_NODES.map((n) => {
           const cx = px(n.x);
           const cy = py(n.y);
+          const active = activeNodes.has(n.name);
           return (
             <g key={n.name}>
-              <circle cx={cx} cy={cy} r={2.4} fill={n.color} opacity={0.5} />
+              <title>{n.name}</title>
+              {active && (
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={4}
+                  fill="none"
+                  stroke={n.color}
+                  strokeWidth={0.5}
+                  opacity={0.7}
+                />
+              )}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={active ? 2.8 : 2.4}
+                fill={n.color}
+                opacity={active ? 1 : 0.45}
+              />
               <text
                 x={cx}
-                y={cy - 3.4}
+                y={cy - 3.6}
                 textAnchor="middle"
                 fontSize={2.6}
-                fill="var(--muted)"
+                fill={active ? "var(--fg)" : "var(--muted)"}
                 style={{ pointerEvents: "none" }}
               >
                 {n.name}
@@ -97,7 +124,7 @@ export default function EmotionalAtlas({
           />
         )}
 
-        {/* waypoint percorsi */}
+        {/* waypoint percorsi (cliccabili) */}
         {points.map((p, i) => (
           <circle
             key={i}
@@ -106,7 +133,11 @@ export default function EmotionalAtlas({
             r={i <= currentIndex ? 1.6 : 1.1}
             fill={i <= currentIndex ? "var(--accent)" : "var(--muted-2)"}
             opacity={i <= currentIndex ? 1 : 0.6}
-          />
+            style={{ cursor: onSelectStep ? "pointer" : "default" }}
+            onClick={() => onSelectStep?.(i)}
+          >
+            <title>Step {i + 1}</title>
+          </circle>
         ))}
 
         {/* posizione corrente */}
