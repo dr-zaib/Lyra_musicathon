@@ -101,6 +101,21 @@ def label_to_distribution(label: str) -> dict[str, float]:
     return dist
 
 
+def text_to_intent(text: str, top_k: int = 3) -> tuple[dict[str, float], float]:
+    """STUB intent reader (placeholder for the LLM agent): free text → (distribution
+    over the top-k nodes summing to 1, confidence=max cosine). Embeds the whole
+    sentence and cosine-maps to the nodes. The real agent replaces this with a
+    proper reading (+ shuffle)."""
+    nodes = node_embeddings()
+    v = embed([text])[0]
+    sims = nodes @ v
+    conf = float(sims.max())
+    order = np.argsort(sims)[::-1][:top_k]
+    sub = _softmax(sims[order], SOFTMAX_TEMP)
+    dist = {NODE_NAMES[int(order[i])]: float(sub[i]) for i in range(len(order))}
+    return dist, conf
+
+
 def _normalize(dist: dict[str, float]) -> dict[str, float]:
     total = sum(dist.values())
     if total <= 0:

@@ -178,6 +178,23 @@ def _citable_verse(analysis: dict, target: np.ndarray | None = None) -> str | No
     return None
 
 
+def _verse_timestamp(commontrack_id, verse: str | None) -> float | None:
+    """Find when the citable verse is sung, via richsync (for the karaoke jump).
+    Matches the verse text to a timed line; None if no match / no richsync."""
+    if not verse or not commontrack_id:
+        return None
+    v = verse.lower().strip()
+    try:
+        lines = mxm.richsync_lines(commontrack_id)
+    except mxm.MusixmatchError:
+        return None
+    for ln in lines:
+        x = (ln.get("text") or "").lower().strip()
+        if x and (x == v or v in x or x in v):
+            return ln.get("ts")
+    return None
+
+
 def find_next_track(target: np.ndarray, candidates: list[dict], used: set,
                     require_richsync: bool = False, min_rating: int = 0):
     """Pick the candidate whose soft-mapped distribution is nearest the target
@@ -245,12 +262,14 @@ def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
             continue
         track = item["track"]
         used.add(track.get("commontrack_id"))
+        verse = _citable_verse(item.get("analysis"), target)
+        ts = _verse_timestamp(track.get("commontrack_id"), verse) if track.get("has_richsync") else None
         steps.append({
             "target_distribution": {"weights": _to_dict(target)},
             "selected_track": _track_candidate(item, vec),
             "transition_reason": "",  # agent fills this (cites citable_verse)
-            "citable_verse": _citable_verse(item.get("analysis"), target),
-            "timestamp_in_song": None,  # filled from richsync at playback wiring
+            "citable_verse": verse,
+            "timestamp_in_song": ts,  # seconds, from richsync — for the karaoke jump
         })
         log.info("step %d: %s - %s  (%s)", step_i,
                  track.get("artist_name"), track.get("track_name"),
