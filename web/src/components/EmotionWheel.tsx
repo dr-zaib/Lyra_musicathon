@@ -1,11 +1,14 @@
 "use client";
 
-// The emotional wheel — the persistent left-panel map.
-// Reacts to the agent's understanding: at low comprehension several emotions glow
-// (a cloud); as comprehension rises, it collapses onto the dominant emotion and a
-// marker sharpens from a wide faint disc to a precise point. Click a node to
-// redirect the journey. Resolution-independent: animates SVG geometry (cx/cy/r)
-// via CSS transitions, so it works at any panel size.
+// The emotional wheel — the persistent emotional map.
+// It renders the agent's intent `distribution` as an angular "radar" shape that morphs
+// (rAF-tweened) as moods accumulate: a single mood is a rhombus pointing at it, a blend
+// a multi-spike form, the first/strongest mood the longest spike. `confidence` controls
+// the shape's sharpness/fog (faint when unsure, crisp when confident).
+//   - mobile (shape, no onSelect): just the shape + active labels (background map).
+//   - desktop (shape + onSelect): the shape over the 12 clickable, labelled nodes, so
+//     you can click an emotion to steer the journey.
+// Resolution-independent (SVG geometry) → works at any panel size.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -35,7 +38,6 @@ export default function EmotionWheel({
   currentEmotion = null,
   showLabels = true,
   shape = false,
-  labelsActiveOnly = false,
   onSelect,
 }: {
   distribution?: Partial<Record<MacroNode, number>>;
@@ -43,13 +45,13 @@ export default function EmotionWheel({
   currentEmotion?: MacroNode | null;
   showLabels?: boolean;
   shape?: boolean;
-  labelsActiveOnly?: boolean;
   onSelect?: (m: MacroNode) => void;
 }) {
   const [hovered, setHovered] = useState<MacroNode | null>(null);
 
-  // Smoothly tween the shape's distribution so it morphs (adapts) instead of jumping
-  // when a new mood is added. Plain rAF — reliable, unlike animating SVG points/d.
+  // Tween the shape's distribution so it morphs (adapts) instead of jumping when a mood
+  // is added. Plain rAF — reliable, unlike animating SVG points/d. Snaps for hidden tabs
+  // and reduced motion.
   const [disp, setDisp] = useState(distribution);
   const dispRef = useRef(distribution);
   useEffect(() => { dispRef.current = disp; }, [disp]);
@@ -57,8 +59,8 @@ export default function EmotionWheel({
   useEffect(() => {
     if (!distribution) { setDisp(undefined); return; }
     const from = dispRef.current;
-    // first appearance, hidden tab, or reduced motion → show it at once (no tween)
-    if (!from || Object.keys(from).length === 0 || document.hidden) { setDisp(distribution); return; }
+    const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!from || Object.keys(from).length === 0 || document.hidden || reduced) { setDisp(distribution); return; }
     const to = distribution;
     const keys = Array.from(new Set([...Object.keys(from), ...Object.keys(to)])) as MacroNode[];
     const start = performance.now();
@@ -76,36 +78,8 @@ export default function EmotionWheel({
   }, [distribution]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const dominant = useMemo<MacroNode | null>(() => {
-    if (currentEmotion) return currentEmotion;
-    if (!distribution) return null;
-    let best: MacroNode | null = null;
-    let bw = 0;
-    for (const [n, w] of Object.entries(distribution) as [MacroNode, number][]) {
-      if (w > bw) { bw = w; best = n; }
-    }
-    return best;
-  }, [distribution, currentEmotion]);
-
-  const marker = useMemo(() => {
-    if (!dominant || currentEmotion) return null;
-    const i = WHEEL_ORDER.indexOf(dominant);
-    const p = at(i, R);
-    return {
-      x: rd(CX + (p.x - CX) * comprehension),
-      y: rd(CY + (p.y - CY) * comprehension),
-      r: rd(13 - comprehension * 9),
-      opacity: rd(0.14 + comprehension * 0.55),
-      color: TAXONOMY[dominant].color,
-    };
-  }, [dominant, comprehension, currentEmotion]);
-
-  // The "emotional signature": the top weighted moods drawn as a morphing shape.
-  // Dominant vertex sits near the rim and is largest; the others pull inward and
-  // shrink by weight — so a single mood reads as one bright point, a blend as a
-  // few-pointed form that builds itself as the conversation sharpens.
-  // Persistent labels for the active moods (top 3), placed just beyond their spike
-  // tips. No dots — the shape itself carries the meaning.
+  // active mood labels (top 3), placed beyond their spike tips — used in shape-only
+  // (mobile) mode where the 12 nodes aren't drawn.
   const verts = useMemo(() => {
     if (!disp) return [] as { name: MacroNode; lx: number; ly: number; anchor: "start" | "middle" | "end"; op: number }[];
     const top = (Object.entries(disp) as [MacroNode, number][])
@@ -123,66 +97,60 @@ export default function EmotionWheel({
       return { name, lx, ly, anchor, op: rd(0.55 + 0.45 * norm) };
     });
   }, [disp]);
-  const activeNames = useMemo(() => new Set(verts.map((v) => v.name)), [verts]);
 
-  // The directional graph: an angular polygon through all 12 nodes, each pushed out
-  // from the center by its weight (inactive collapse toward the center). One mood → a
-  // tight rhombus/arrow at it; a blend → a multi-spike form toward the dominant.
+  // the radar polygon: one cohesive angular shape through all 12 nodes, each pushed out
+  // by its weight (floor keeps a small core). One mood → a rhombus/arrow at it.
   const radar = useMemo(() => {
     if (!disp) return null;
     const ws = WHEEL_ORDER.map((n) => disp[n] ?? 0);
     const maxW = Math.max(...ws, 0.0001);
     const dom = WHEEL_ORDER[ws.indexOf(Math.max(...ws))];
     const points = WHEEL_ORDER.map((n, i) => {
-      // floor keeps the polygon one cohesive shape (a small core) that bulges toward moods
       const p = at(i, R * (0.15 + 0.85 * ((disp[n] ?? 0) / maxW)));
       return `${p.x},${p.y}`;
     }).join(" ");
     return { points, color: TAXONOMY[dom].color };
   }, [disp]);
 
-  function nodeStyle(name: MacroNode) {
-    const w = distribution?.[name] ?? 0;
-    let op: number;
-    let r = 2;
-    if (hovered) {
-      op = name === hovered ? 1 : 0.1;
-      r = name === hovered ? 3.4 : 2;
-    } else if (currentEmotion) {
-      op = name === currentEmotion ? 1 : 0.18;
-      r = name === currentEmotion ? 3.2 : 2;
-    } else if (dominant) {
-      if (name === dominant) { op = Math.min(1, 0.5 + comprehension * 0.5); r = rd(2.4 + comprehension * 1.4); }
-      else if (w > 0) op = Math.max(0.12, (0.4 + w * 0.4) * (1 - comprehension * 0.85));
-      else op = Math.max(0.08, 0.25 * (1 - comprehension));
-    } else {
-      op = 0.55;
-    }
-    return { op: rd(op), r };
+  function nodeStyle(name: MacroNode): { op: number; r: number } {
+    const w = disp?.[name] ?? 0;
+    if (hovered === name) return { op: 1, r: 3.2 };
+    if (currentEmotion === name) return { op: 1, r: 3 };
+    if (w > 0.04) return { op: rd(Math.min(1, 0.55 + w * 0.6)), r: rd(2 + w * 1.6) };
+    if (hovered) return { op: 0.12, r: 2 };
+    return { op: 0.4, r: 2 };
   }
+
+  const interactive = !!onSelect;
 
   return (
     <svg viewBox="-16 -16 132 132" className="h-full w-full" role="img" aria-label="emotional wheel">
       <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--border)" strokeWidth={0.4} />
       <circle cx={CX} cy={CY} r={R * 0.4} fill="none" stroke="var(--border)" strokeWidth={0.3} />
 
-      {marker && !shape && (
-        <circle
-          cx={marker.x} cy={marker.y} r={marker.r} fill={marker.color} opacity={marker.opacity}
-          style={{ transition: "cx .65s cubic-bezier(.22,.9,.25,1), cy .65s cubic-bezier(.22,.9,.25,1), r .65s ease, opacity .65s ease, fill .4s ease" }}
+      {/* the directional graph — one cohesive angular shape that morphs as moods accumulate;
+          confidence controls its sharpness (faint when unsure, crisp when confident) */}
+      {shape && radar && (
+        <polygon
+          points={radar.points}
+          fill={radar.color} fillOpacity={rd(0.08 + comprehension * 0.16)}
+          stroke={radar.color} strokeOpacity={rd(0.3 + comprehension * 0.4)} strokeWidth={0.8} strokeLinejoin="round"
+          style={{ transition: "fill .4s ease, stroke .4s ease, fill-opacity .5s ease, stroke-opacity .5s ease" }}
         />
       )}
 
-      {!shape && WHEEL_ORDER.map((name, i) => {
+      {/* desktop: the 12 clickable, labelled nodes (orientation + steering) */}
+      {interactive && WHEEL_ORDER.map((name, i) => {
         const p = at(i, R);
         const lp = at(i, RL);
         const { op, r } = nodeStyle(name);
         const color = TAXONOMY[name].color;
         const anchor = lp.x > CX + 1 ? "start" : lp.x < CX - 1 ? "end" : "middle";
+        const active = (disp?.[name] ?? 0) > 0.04 || hovered === name || currentEmotion === name;
         return (
           <g
             key={name}
-            style={{ cursor: onSelect ? "pointer" : "default" }}
+            style={{ cursor: "pointer" }}
             onMouseEnter={() => setHovered(name)}
             onMouseLeave={() => setHovered(null)}
             onClick={() => onSelect?.(name)}
@@ -192,11 +160,11 @@ export default function EmotionWheel({
               cx={p.x} cy={p.y} r={r} fill={color} opacity={op}
               style={{ transition: "r .4s cubic-bezier(.22,.9,.25,1), opacity .5s ease" }}
             />
-            {showLabels && !shape && (!labelsActiveOnly || activeNames.has(name)) && (
+            {showLabels && (
               <text
                 x={lp.x} y={lp.y + 1} textAnchor={anchor} fontSize={2.7}
-                fill={hovered === name || currentEmotion === name ? "var(--fg)" : "var(--muted)"}
-                opacity={op < 0.2 ? 0.4 : 1}
+                fill={active ? "var(--fg)" : "var(--muted)"}
+                opacity={active ? 1 : 0.5}
                 style={{ transition: "opacity .5s ease, fill .3s ease" }}
               >
                 {name}
@@ -206,28 +174,17 @@ export default function EmotionWheel({
         );
       })}
 
-      {shape && radar && (
-        <g>
-          {/* the directional graph — an angular shape that morphs as moods accumulate
-              (point positions are tweened in `disp`, so it adapts instead of jumping) */}
-          <polygon
-            points={radar.points}
-            fill={radar.color} fillOpacity={0.2}
-            stroke={radar.color} strokeOpacity={0.55} strokeWidth={0.8} strokeLinejoin="round"
-            style={{ transition: "fill .4s ease, stroke .4s ease" }}
-          />
-          {showLabels && verts.map((v) => (
-            <text
-              key={`lab-${v.name}`}
-              x={v.lx} y={v.ly} textAnchor={v.anchor} fontSize={2.7}
-              fill="var(--fg)" opacity={v.op}
-              style={{ transition: "x .6s cubic-bezier(.22,.9,.25,1), y .6s cubic-bezier(.22,.9,.25,1), opacity .5s ease" }}
-            >
-              {v.name}
-            </text>
-          ))}
-        </g>
-      )}
+      {/* shape-only (mobile): label just the active moods */}
+      {shape && !interactive && showLabels && verts.map((v) => (
+        <text
+          key={`lab-${v.name}`}
+          x={v.lx} y={v.ly} textAnchor={v.anchor} fontSize={2.7}
+          fill="var(--fg)" opacity={v.op}
+          style={{ transition: "x .6s cubic-bezier(.22,.9,.25,1), y .6s cubic-bezier(.22,.9,.25,1), opacity .5s ease" }}
+        >
+          {v.name}
+        </text>
+      ))}
     </svg>
   );
 }

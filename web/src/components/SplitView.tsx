@@ -157,7 +157,7 @@ export default function SplitView() {
         {/* the emotional signature builds itself as the conversation sharpens — not interactive */}
         <div className="pointer-events-none absolute left-1/2 top-[36%] aspect-square w-[150vw] max-w-[600px] -translate-x-1/2 -translate-y-1/2 opacity-50">
           <div className="lyra-breathe h-full w-full">
-            <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape labelsActiveOnly />
+            <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape />
           </div>
         </div>
         {/* readability scrim under the chat */}
@@ -189,7 +189,7 @@ export default function SplitView() {
               )}
             </div>
             <div className="flex-1">
-              <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} onSelect={redirect} />
+              <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape onSelect={redirect} />
             </div>
           </section>
           <section className="flex w-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
