@@ -1,88 +1,21 @@
 "use client";
 
 // The app, responsive.
-//  - Mobile (base): living background — the wheel is a big, dimmed, breathing
-//    backdrop; the conversation floats over a bottom scrim. Tap the top to bring
-//    the wheel forward as an interactive map; tap the chat to return.
+//  - Mobile (base): the wheel is a non-interactive background that builds its
+//    "emotional signature"; the conversation is the surface; the player is fixed.
 //  - Desktop (md:+): the 50/50 split — wheel left, agent right.
-// Same state/audio for both. Comprehension % is mocked (rises per message);
-// real value = the agent's confidence once wired.
+// One conversational seam: every user action is an "agent turn" (POST /api/agent →
+// { message, confidence, distribution, shuffle, trajectory }). The route proxies the
+// real backend and falls back to a local mock agent, so the demo never dies.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ConversationPanel, { type Msg } from "./ConversationPanel";
 import EmotionWheel from "./EmotionWheel";
 import PlayerBar from "./PlayerBar";
-import type { MacroNode, NodeDistribution, Trajectory, TrajectoryShape } from "@/lib/types";
+import type { AgentTurn, AgentTurnRequest, MacroNode, NodeDistribution, Trajectory, TrajectoryShape } from "@/lib/types";
 
-const ORDER: MacroNode[] = [
-  "Tenderness", "Hope", "Joy", "Empowerment",
-  "Awe", "Defiance", "Anger", "Anxiety",
-  "Melancholia", "Solitude", "Reflection", "Nostalgia",
-];
-
-const KEYWORDS: [RegExp, MacroNode][] = [
-  [/joy|happy|excited|good|great/, "Joy"],
-  [/hope|better|looking up/, "Hope"],
-  [/tender|love|warm|soft/, "Tenderness"],
-  [/power|strong|confident|unstoppable/, "Empowerment"],
-  [/awe|wonder|vast|amazed/, "Awe"],
-  [/defian|rebel|bold/, "Defiance"],
-  [/anger|angry|mad|furious|rage/, "Anger"],
-  [/anx|nervous|worried|stress|restless|on edge/, "Anxiety"],
-  [/sad|down|blue|melanchol|cry|low/, "Melancholia"],
-  [/lonely|alone|solitud|empty/, "Solitude"],
-  [/reflect|think|pensive|quiet/, "Reflection"],
-  [/nostalg|miss|memory|past|remember/, "Nostalgia"],
-];
-
-const FOLLOWUPS = [
-  "tell me more — what's underneath it?",
-  "is it heavy and still, or restless?",
-  "clear — i can feel where you are now.",
-];
-
-// safety: distress is never a "mood to soundtrack". keyword stub here; the real
-// agent (LLM) owns the robust version + a dedicated tool.
-const CRISIS = /(kill myself|killing myself|end my life|end it all|want to die|wanna die|don'?t want to (live|be here|exist)|no reason to live|suicid|self.?harm|hurt myself|harm myself)/i;
-const CRISIS_REPLY =
-  "i'm really glad you told me — and i'm not going to just hand you a playlist for this. you deserve to talk to someone who can help: please reach out to someone you trust, or a free, confidential helpline in your country (you can find one at findahelpline.com). i'm here.";
-const AFFIRM = /^\s*(yes|yeah|yep|yup|exactly|right|correct|that'?s it|true|sure|definitely)\b/i;
-// the user signalling they're done describing → go straight to play
-const READY = /^\s*(ok(ay)?|that'?s (it|enough|all)|enough|i'?m (good|done|ready|fine|all set|ok)|all set|let'?s go|just play|play( it| something)?|go ahead|done|ready)\s*$/i;
-
-// Moods accumulate across the conversation: a new mood adds its spike (plus a little
-// to its neighbours, so a single mood reads as a rhombus) while the earlier ones decay
-// but don't vanish — the shape adapts instead of jumping.
-function bump(w: Partial<Record<MacroNode, number>>, m: MacroNode, amount: number) {
-  const i = ORDER.indexOf(m);
-  const prev = ORDER[(i + ORDER.length - 1) % ORDER.length];
-  const next = ORDER[(i + 1) % ORDER.length];
-  w[m] = (w[m] ?? 0) + amount;
-  w[prev] = (w[prev] ?? 0) + amount * 0.25;
-  w[next] = (w[next] ?? 0) + amount * 0.25;
-}
-function accumulate(prev: NodeDistribution | undefined, m: MacroNode): NodeDistribution {
-  const w: Partial<Record<MacroNode, number>> = {};
-  if (prev) for (const [k, v] of Object.entries(prev.weights)) w[k as MacroNode] = (v ?? 0) * 0.55;
-  bump(w, m, 1);
-  return { weights: w };
-}
-function interpretMaybe(text: string): { mood: MacroNode; confident: boolean } | null {
-  const v = text.toLowerCase();
-  for (const [re, m] of KEYWORDS) if (re.test(v)) return { mood: m, confident: true };
-  if (v.trim().split(/\s+/).length <= 2) return null; // too little to read
-  return { mood: "Reflection", confident: false };    // a guess, to be confirmed
-}
-
-async function fetchTrajectory(seed: MacroNode, shape: TrajectoryShape): Promise<Trajectory> {
-  const res = await fetch("/api/trajectory", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ seed_mood: seed, shape }),
-  });
-  return res.json();
-}
+// Musixmatch gives no audio → enrich each track with an iTunes 30s preview client-side.
 async function enrichWithAudio(traj: Trajectory): Promise<Trajectory> {
   const steps = await Promise.all(
     traj.steps.map(async (s) => {
@@ -103,8 +36,6 @@ export default function SplitView() {
   const [messages, setMessages] = useState<Msg[]>([{ role: "agent", text: "describe your mood — in your own words." }]);
   const [comprehension, setComprehension] = useState(0);
   const [distribution, setDistribution] = useState<NodeDistribution | undefined>(undefined);
-  const [seed, setSeed] = useState<MacroNode | null>(null);
-  const [turn, setTurn] = useState(0);
   const [draft, setDraft] = useState("");
 
   const [trajectory, setTrajectory] = useState<Trajectory | null>(null);
@@ -113,10 +44,11 @@ export default function SplitView() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const autoStarted = useRef(false);
+  const sessionId = useRef<string>(crypto.randomUUID());
 
   const steps = trajectory?.steps ?? [];
   const currentStep = steps[index] ?? null;
+  const canStart = !!distribution && Object.keys(distribution.weights).length > 0;
 
   const currentEmotion = useMemo<MacroNode | null>(() => {
     if (!currentStep) return null;
@@ -125,6 +57,7 @@ export default function SplitView() {
     return best;
   }, [currentStep]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- syncing the <audio> element (an external system) */
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !trajectory) return;
@@ -133,87 +66,50 @@ export default function SplitView() {
     a.src = url; a.load();
     a.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
   }, [index, trajectory]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // One conversational turn → the agent. Renders the reply, drives the wheel
+  // (distribution) + comprehension (confidence), and starts the journey if the agent
+  // decided to emit one.
+  const sendTurn = useCallback(async (req: Omit<AgentTurnRequest, "session_id">, userText?: string) => {
+    if (userText) setMessages((m) => [...m, { role: "user", text: userText }]);
+    let turn: AgentTurn;
+    try {
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...req, session_id: sessionId.current }),
+      });
+      turn = await res.json();
+    } catch {
+      return;
+    }
+    setMessages((m) => [...m, { role: "agent", text: turn.message }]);
+    setComprehension(turn.confidence);
+    setDistribution(turn.distribution);
+    if (turn.trajectory) {
+      const traj = await enrichWithAudio(turn.trajectory);
+      setTrajectory(traj); setIndex(0);
+    }
+  }, []);
 
   const submit = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
     setDraft("");
+    sendTurn({ message: text }, text);
+  }, [draft, sendTurn]);
 
-    // safety: never soundtrack distress — respond with care, don't proceed.
-    if (CRISIS.test(text)) {
-      setMessages((m) => [...m, { role: "user", text }, { role: "agent", text: CRISIS_REPLY }]);
-      return;
-    }
-
-    // done describing → go straight to play (auto-starts at full understanding)
-    if (READY.test(text)) {
-      if (seed) {
-        setMessages((m) => [...m, { role: "user", text }, { role: "agent", text: "got it — let's play." }]);
-        setComprehension(1);
-      } else {
-        setMessages((m) => [...m, { role: "user", text }, { role: "agent", text: "give me even one word for how you feel — or tap “i can't describe my mood” and i'll lead." }]);
-      }
-      setTurn((t) => t + 1);
-      return;
-    }
-
-    // confirming a previous low-confidence guess
-    if (seed && AFFIRM.test(text)) {
-      setMessages((m) => [...m, { role: "user", text }, { role: "agent", text: "good — i've got you now." }]);
-      setComprehension((c) => Math.min(1, c + 0.4));
-      setTurn((t) => t + 1);
-      return;
-    }
-
-    const guess = interpretMaybe(text);
-    if (!guess) {
-      setMessages((m) => [...m, { role: "user", text }, { role: "agent", text: "i can't quite place that yet — tell me what it feels like, or a moment it brings up." }]);
-      return;
-    }
-
-    setSeed(guess.mood); setDistribution((prev) => accumulate(prev, guess.mood));
-    if (guess.confident) {
-      setMessages((m) => [...m, { role: "user", text }, { role: "agent", text: FOLLOWUPS[Math.min(turn, FOLLOWUPS.length - 1)] }]);
-      setComprehension((c) => Math.min(1, c + 0.34));
-    } else {
-      // guide: make the guess explicit and ask, instead of declaring it done
-      setMessages((m) => [...m, { role: "user", text }, { role: "agent", text: `it reads to me like ${guess.mood.toLowerCase()} — does that land, or am i off?` }]);
-      setComprehension((c) => Math.min(0.5, c + 0.18));
-    }
-    setTurn((t) => t + 1);
-  }, [draft, turn, seed]);
-
-  const startJourney = useCallback(async (shape: TrajectoryShape) => {
-    const s = seed ?? "Melancholia";
-    setMessages((m) => [...m, { role: "agent", text: shape === "evolve" ? "let's drift somewhere new — follow me." : "let's go deeper into this." }]);
-    const traj = await enrichWithAudio(await fetchTrajectory(s, shape));
-    setTrajectory(traj); setIndex(0);
-  }, [seed]);
-
-  // Full understanding → don't make the user hunt for a button: begin the journey
-  // on its own (once). Below 100%, the primary "play" button is always there.
-  useEffect(() => {
-    if (comprehension >= 1 && seed && !trajectory && !autoStarted.current) {
-      autoStarted.current = true;
-      const t = setTimeout(() => startJourney("deepen"), 900);
-      return () => clearTimeout(t);
-    }
-  }, [comprehension, seed, trajectory, startJourney]);
-
-  const redirect = useCallback((m: MacroNode) => {
-    setSeed(m); setDistribution((prev) => accumulate(prev, m));
-    setComprehension((c) => Math.min(1, c + 0.2));
-    setMessages((msg) => [...msg, { role: "user", text: `take me toward ${m.toLowerCase()}` }, { role: "agent", text: `${m.toLowerCase()} it is.` }]);
-  }, []);
+  const startJourney = useCallback((shape: TrajectoryShape) => { sendTurn({ shape }); }, [sendTurn]);
+  const redirect = useCallback((m: MacroNode) => { sendTurn({ seed_mood: m }, `take me toward ${m.toLowerCase()}`); }, [sendTurn]);
 
   const reset = useCallback(() => {
     const a = audioRef.current;
     if (a) { a.pause(); a.removeAttribute("src"); }
-    autoStarted.current = false;
+    sessionId.current = crypto.randomUUID();
     setMessages([{ role: "agent", text: "describe your mood — in your own words." }]);
-    setComprehension(0); setDistribution(undefined); setSeed(null); setTurn(0);
-    setTrajectory(null); setIndex(0); setIsPlaying(false); setCurrentTime(0); setDuration(0);
-    setDraft("");
+    setComprehension(0); setDistribution(undefined);
+    setTrajectory(null); setIndex(0); setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
 
   const go = (i: number) => setIndex(Math.max(0, Math.min(steps.length - 1, i)));
@@ -225,13 +121,14 @@ export default function SplitView() {
   const seek = (t: number) => { const a = audioRef.current; if (a) a.currentTime = t; };
 
   const convoProps = {
-    messages, comprehension, seed, trajectory,
+    messages, comprehension, canStart, trajectory,
     draft, setDraft, onSubmit: submit, onDeepen: () => startJourney("deepen"),
     onEvolve: () => startJourney("evolve"),
   };
   const player = trajectory ? (
     <PlayerBar
       track={currentStep?.selected_track ?? null}
+      verse={currentStep?.citable_verse ?? null}
       isPlaying={isPlaying} currentTime={currentTime} duration={duration}
       hasPrev={index > 0} hasNext={index < steps.length - 1}
       onToggle={toggle} onPrev={() => go(index - 1)} onNext={() => go(index + 1)} onSeek={seek}
@@ -249,7 +146,7 @@ export default function SplitView() {
 
       {/* ===== MOBILE: chat-driven; the wheel builds its shape in the background; fixed player ===== */}
       <div className="relative flex h-screen flex-col overflow-hidden md:hidden">
-        {(seed || trajectory) && (
+        {(canStart || trajectory) && (
           <button
             onClick={reset} aria-label="start over" title="start over"
             className="absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-full text-base text-muted-2 transition hover:bg-white/5 hover:text-fg"
@@ -287,7 +184,7 @@ export default function SplitView() {
             <div className="mb-2 flex items-baseline gap-3">
               <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra</span>
               <span className="text-xs text-muted-2">your emotional map</span>
-              {(seed || trajectory) && (
+              {(canStart || trajectory) && (
                 <button onClick={reset} aria-label="start over" title="start over" className="ml-auto text-base text-muted-2 transition hover:text-fg">↺</button>
               )}
             </div>

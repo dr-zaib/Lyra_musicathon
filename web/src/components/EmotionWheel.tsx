@@ -53,6 +53,7 @@ export default function EmotionWheel({
   const [disp, setDisp] = useState(distribution);
   const dispRef = useRef(distribution);
   useEffect(() => { dispRef.current = disp; }, [disp]);
+  /* eslint-disable react-hooks/set-state-in-effect -- this effect drives an rAF tween (animation) */
   useEffect(() => {
     if (!distribution) { setDisp(undefined); return; }
     const from = dispRef.current;
@@ -73,6 +74,7 @@ export default function EmotionWheel({
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [distribution]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const dominant = useMemo<MacroNode | null>(() => {
     if (currentEmotion) return currentEmotion;
@@ -114,7 +116,7 @@ export default function EmotionWheel({
     return top.map(([name, w]) => {
       const norm = w / maxW;
       const ang = (WHEEL_ORDER.indexOf(name) * 2 * Math.PI) / WHEEL_ORDER.length;
-      const lr = R * norm + 4.5;
+      const lr = R * (0.15 + 0.85 * norm) + 4;
       const lx = rd(CX + lr * Math.cos(ang));
       const ly = rd(CY - lr * Math.sin(ang));
       const anchor: "start" | "middle" | "end" = lx > CX + 1 ? "start" : lx < CX - 1 ? "end" : "middle";
@@ -132,7 +134,8 @@ export default function EmotionWheel({
     const maxW = Math.max(...ws, 0.0001);
     const dom = WHEEL_ORDER[ws.indexOf(Math.max(...ws))];
     const points = WHEEL_ORDER.map((n, i) => {
-      const p = at(i, R * ((disp[n] ?? 0) / maxW));
+      // floor keeps the polygon one cohesive shape (a small core) that bulges toward moods
+      const p = at(i, R * (0.15 + 0.85 * ((disp[n] ?? 0) / maxW)));
       return `${p.x},${p.y}`;
     }).join(" ");
     return { points, color: TAXONOMY[dom].color };

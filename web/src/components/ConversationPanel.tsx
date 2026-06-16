@@ -5,7 +5,7 @@
 //  - variant "panel"    → desktop split (bordered card)
 //  - variant "floating" → mobile living-background (frosted, over the scrim)
 
-import type { MacroNode, Trajectory } from "@/lib/types";
+import type { Trajectory } from "@/lib/types";
 
 export type Msg = { role: "agent" | "user"; text: string };
 
@@ -13,7 +13,7 @@ export default function ConversationPanel({
   variant,
   messages,
   comprehension,
-  seed,
+  canStart,
   trajectory,
   draft,
   setDraft,
@@ -24,7 +24,7 @@ export default function ConversationPanel({
   variant: "panel" | "floating";
   messages: Msg[];
   comprehension: number;
-  seed: MacroNode | null;
+  canStart: boolean;
   trajectory: Trajectory | null;
   draft: string;
   setDraft: (s: string) => void;
@@ -70,7 +70,7 @@ export default function ConversationPanel({
           <div className="mt-3 flex flex-col gap-2">
             <button
               onClick={onDeepen}
-              disabled={!seed}
+              disabled={!canStart}
               className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-medium text-bg transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-bg-elev-2 disabled:text-muted-2"
             >
               <span aria-hidden>▶</span> play my journey

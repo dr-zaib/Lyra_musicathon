@@ -14,6 +14,7 @@ function fmt(s: number): string {
 
 export default function PlayerBar({
   track,
+  verse,
   isPlaying,
   currentTime,
   duration,
@@ -25,6 +26,7 @@ export default function PlayerBar({
   onSeek,
 }: {
   track: TrackCandidate | null;
+  verse?: string | null;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -39,6 +41,13 @@ export default function PlayerBar({
 
   return (
     <div className="sticky bottom-0 z-20 border-t border-border bg-bg-elev/90 backdrop-blur">
+      {/* the cited line — lyrics-first moment (Musixmatch richsync) */}
+      {verse && (
+        <div className="mx-auto flex max-w-6xl items-baseline justify-center gap-2 px-6 pt-2 text-center">
+          <span className="truncate text-xs italic text-fg/75">“{verse}”</span>
+          <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-2">richsync</span>
+        </div>
+      )}
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
         <div className="hidden min-w-0 flex-1 sm:block">
           {track && (
