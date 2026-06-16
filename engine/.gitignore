@@ -1,0 +1,7 @@
+.ipynb_checkpoints/
+data_test/
+.cache
+.cache-*
+_validate_*.py
+__pycache__/
+# data/ holds our OWN seed artifacts (Spotify metadata only) — safe to commit.

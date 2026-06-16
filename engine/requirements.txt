@@ -1,0 +1,4 @@
+# Minimal deps for the dataset-builder notebook. The canonical env is uv/pyproject.
+spotipy
+python-dotenv
+pandas    # optional, only used if you prefer pandas for the CSV export

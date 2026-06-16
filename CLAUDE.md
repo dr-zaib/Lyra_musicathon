@@ -72,7 +72,8 @@ Young framework (v0.x) → keep it in a **low-risk role**:
 - ✅ FastAPI backend (`backend/`) with MOCK engine+agent; Next→backend seam verified end-to-end.
 - ✅ Interactive emotional wheel + "karaoke" line synced to audio (Motion).
 - ✅ Fixed Python env via uv (3.12 + uv.lock); datapizza-ai install validated.
-- ⏳ Real agent (datapizza) + engine: to build (agent tonight, co-build).
+- ✅ **Engine built & validated (Axel, `engine/`)**: Spotify seed (303 tracks, 100% ISRC) → Musixmatch **WS-E gate PASSED** (`analysis.get` moods/themes/meaning; **`analysis.search` cracked** → candidates+analysis+ranking over the whole catalog) → soft-map (mpnet + Claude fallback) → trajectory engine (deepen/evolve/escalate) emitting the contract `Trajectory` with citable verses. **Strada B (analysis.search-primary)**.
+- ⏳ To do: quality tuning of selection, engine→backend wire (swap `mock_engine`), agent (datapizza), richsync timestamp for the karaoke line.
 
 ## How we work
 - Work on `main` (light process, no PR ceremony). Short branches only if needed.
@@ -84,12 +85,13 @@ Young framework (v0.x) → keep it in a **low-risk role**:
 - **2026-06-16** — FastAPI backend scaffolded with MOCK engine+agent and swap point; Next→backend proxy with fallback; found Python <3.13 constraint for datapizza-ai.
 - **2026-06-16** — Fixed/reproducible env adopted via uv (Python 3.12 pinned, uv.lock); datapizza-ai 0.1.0 verified on 3.12. Repo language: English only (app + docs).
 - **2026-06-16** — Landing page = dynamic rotating emotional wheel (clockwise orbit, upright labels, comet accent) with the mood/direction questions in the center. The session screen still shows a wheel too (duplicate is OK for now). Aesthetic: violet, kept sober (not too mystical) — Musixmatch-adjacent, not a clone.
+- **2026-06-16** — Engine built & validated (Axel). **WS-E gate PASSED**: Musixmatch `analysis.get` returns moods/themes/meaning, and **`analysis.search` works** (POST, params under a `data` key; ONE call → candidates + analysis + ranking over the whole catalog — the build plan's architectural key). Decision: **Strada B — analysis.search-primary + guardrails** (popularity floor via `track_rating`, `lyrics_language`, prefer `has_richsync`); the 303 Spotify seed becomes curated starting points / safety net, NOT the catalog. Soft-map = mpnet (all-mpnet-base-v2) embeddings + Claude fallback for ambiguous themes. Engine emits the contract `Trajectory` (deepen/evolve/escalate) with target-aligned citable verses. Bonus: `track_rating`/`num_favourite` restore the popularity signal Spotify denied (its /tracks endpoint 403s in dev mode). Spotify seed itself was read-only from the user's OWN playlists (dev-mode API limit).
 - **2026-06-16** — Input-modality scope fixed. **Demo input = text composer + click-a-node only.** Voice (STT in, ElevenLabs TTS out) and ambient / zero-input "readiness" (implicit feedback from skip/keep reactions + light context priors, e.g. driving) are **pitch/roadmap only — NOT built for the demo.** They are additive layers *upstream* of the same meaning-first pipeline, so they change neither the engine nor the contract. Rationale: "not knowing your exact mood" is already handled by the conversation + confidence (cloud→point) loop; voice/ambient strengthen the pitch (tie to ElevenLabs + the Memory mode) at zero cost to the demo.
 
 ## Next moves
-- WS-A (Alberto+Axel, session): build the datapizza-ai agent.
-- WS-D (Axel): real engine filling the contract.
-- WS-E (shared, post-key): validate `track.lyrics.analysis.search` as a blocking gate.
+- WS-A (Alberto+Axel, session): build the datapizza-ai agent (intent→`seed_mood`+`shape`, `transition_reason` citing `citable_verse`, plus `confidence`+`distribution` — see the open contract questions in UX architecture).
+- WS-D (Axel): engine BUILT ✅ — remaining: quality tuning of track selection, wire into the backend (swap `mock_engine`), richsync timestamp for the karaoke line.
+- WS-E (shared): ✅ DONE — `analysis.search` validated, gate passed, Strada B adopted.
 - Deploy: backend on Replit, frontend on Vercel/Replit. Pitch + cover + video by the 21st.
 
 ## Open TODOs (design)
