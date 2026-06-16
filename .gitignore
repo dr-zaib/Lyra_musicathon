@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Node / Next (web/ ha anche il suo .gitignore)
+node_modules/
+.next/
+.env.local

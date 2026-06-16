@@ -1,0 +1,4 @@
+fastapi
+uvicorn[standard]
+pydantic>=2
+# Per l'agente reale aggiungere: datapizza-ai (richiede Python >=3.10,<3.13)

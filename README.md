@@ -26,7 +26,20 @@ npm run dev      # http://localhost:3000
 ```
 
 Gira **da solo, senza API key**: l'audio è reale (preview iTunes, pubbliche), la
-traiettoria è mock.
+traiettoria è mock (fallback se il backend è giù).
+
+## Far girare il backend (opzionale in dev)
+
+```bash
+cd backend
+python -m venv .venv && .venv\Scripts\activate   # Windows
+pip install -r requirements.txt
+uvicorn app:app --reload --port 8010
+```
+
+Poi in `web/.env.local`: `BACKEND_URL=http://localhost:8010`. Engine e agent sono
+MOCK (`mock_engine.py`, `agent.py`); gli swap point sono in `app.py`.
+NB: l'agente reale (datapizza-ai) richiede **Python >=3.10,<3.13** → venv 3.12.
 
 ## La cucitura (mock -> motore vero)
 

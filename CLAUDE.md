@@ -23,9 +23,14 @@ Next (web/, Alberto) ──HTTP──> Backend Python (FastAPI) ──> Musixmat
                                 └─ engine/ (traiettorie, Axel)
 ```
 Due cuciture: `web → backend` (HTTP, stesso JSON) e `agent ↔ engine` (`shared/`).
-Oggi il backend non esiste ancora: `web/src/app/api/trajectory` usa un **mock**
-in-Next (`web/src/lib/mockData.ts`, canzoni reali → audio iTunes vero). Quando il
-backend Python è pronto, quella route diventa un proxy e il frontend non cambia.
+Il backend `backend/` è già in piedi (FastAPI, `POST /recommend`) con **engine e
+agent MOCK** (`backend/mock_engine.py`, `backend/agent.py`). Swap point in
+`app.py`: stasera `mock_engine` → `engine/` reale (Axel), `agent` → datapizza-ai.
+`web/src/app/api/trajectory` proxa il backend via `BACKEND_URL` e **ripiega sul
+mock locale** (`web/src/lib/mockData.ts`) se il backend è giù → la demo non muore mai.
+
+⚠️ **Python**: datapizza-ai richiede **>=3.10,<3.13**. Il sistema ha 3.14 → per il
+backend reale (con l'agente) creare un **venv 3.12**. Il mock attuale gira su 3.14.
 
 ## Il contratto
 `shared/schema.py` (Pydantic, lato Axel) ↔ `web/src/lib/types.ts` (lato Alberto),
@@ -54,7 +59,9 @@ Framework giovane (v0.0.x) → tenerlo in **ruolo a basso rischio**:
 - ✅ Scaffold `web/` (Next 16 + TS + Tailwind v4) su `main`.
 - ✅ Discover skeleton funzionante: MoodPicker → atlante SVG → step card (verso citato) → player con auto-avanzamento. **Audio iTunes reale**, traiettoria mock.
 - ✅ Contratto `shared/schema.py` + `web/src/lib/types.ts`.
-- ⏳ Agent + engine reali: da costruire.
+- ✅ Backend FastAPI (`backend/`) con engine+agent MOCK; seam Next→backend provata end-to-end.
+- ✅ Atlante interattivo + verso "karaoke" sincronizzato all'audio.
+- ⏳ Agent (datapizza) + engine reali: da costruire (agent stasera, co-build).
 
 ## Come lavoriamo
 - Si lavora su `main` (processo leggero, niente cerimonia PR). Branch corti solo se serve.
@@ -63,6 +70,7 @@ Framework giovane (v0.0.x) → tenerlo in **ruolo a basso rischio**:
 
 ## Decision log
 - **2026-06-16** — Architettura a grafo discreto (no vector DB) confermata; ruolo agent definito (engine=dati, agent=narrazione); scaffold frontend mergiato su main; audio via iTunes preview.
+- **2026-06-16** — Backend FastAPI scaffoldato con engine+agent MOCK e swap point; proxy Next→backend con fallback; trovato vincolo Python <3.13 per datapizza-ai (sistema 3.14 → serve venv 3.12).
 
 ## Next moves
 - WS-C (Alberto, in corso): graph interattiva + legenda + sync del verso sull'audio.
