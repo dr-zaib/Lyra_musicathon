@@ -83,9 +83,14 @@ Young framework (v0.x) → keep it in a **low-risk role**:
 - **2026-06-16** — Discrete-graph architecture (no vector DB) confirmed; agent role defined (engine=data, agent=narration); frontend scaffold merged to main; audio via iTunes preview.
 - **2026-06-16** — FastAPI backend scaffolded with MOCK engine+agent and swap point; Next→backend proxy with fallback; found Python <3.13 constraint for datapizza-ai.
 - **2026-06-16** — Fixed/reproducible env adopted via uv (Python 3.12 pinned, uv.lock); datapizza-ai 0.1.0 verified on 3.12. Repo language: English only (app + docs).
+- **2026-06-16** — Landing page = dynamic rotating emotional wheel (clockwise orbit, upright labels, comet accent) with the mood/direction questions in the center. The session screen still shows a wheel too (duplicate is OK for now). Aesthetic: violet, kept sober (not too mystical) — Musixmatch-adjacent, not a clone.
 
 ## Next moves
 - WS-A (Alberto+Axel, session): build the datapizza-ai agent.
 - WS-D (Axel): real engine filling the contract.
 - WS-E (shared, post-key): validate `track.lyrics.analysis.search` as a blocking gate.
 - Deploy: backend on Replit, frontend on Vercel/Replit. Pitch + cover + video by the 21st.
+
+## Open TODOs (design)
+- Palette: decide whether to keep the violet aesthetic or move it closer to Musixmatch's brand (adapt, not clone).
+- Session screen viz: rework the second-screen visualization — leaning toward a graph style, but the current one is standard and can be improved a lot.

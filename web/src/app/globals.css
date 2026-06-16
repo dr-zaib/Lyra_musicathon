@@ -81,3 +81,31 @@ body::before {
 .animate-fade-up {
   animation: fade-up 0.4s ease both;
 }
+
+/* rotating landing wheel: the group orbits clockwise, labels counter-rotate
+   about their own center so they stay upright. */
+@keyframes wheel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes wheel-spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+.wheel-orbit {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: wheel-spin 90s linear infinite;
+}
+.wheel-label {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: wheel-spin-rev 90s linear infinite;
+}
+.wheel-comet {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: wheel-spin 14s linear infinite;
+}
