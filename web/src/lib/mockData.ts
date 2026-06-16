@@ -1,15 +1,15 @@
-// Lyra — dati mock del trajectory engine (fallback se il backend Python è giù).
+// Lyra — mock trajectory engine data (fallback when the Python backend is down).
 //
-// Canzoni REALI (artist+title) → l'audio preview iTunes funziona davvero.
-// Palette: black music (R&B, rap, reggaeton, salsa) con un arco emotivo coerente.
+// REAL songs (artist+title) so the iTunes audio preview actually works.
+// Palette: black music (R&B, rap, reggaeton, salsa) with a coherent emotional arc.
 //
-// I `citable_verse` sono PLACEHOLDER: i versi veri arrivano a runtime da
-// Musixmatch richsync (licenza + regola no-store). Non hardcodiamo lyrics.
+// `citable_verse` is a PLACEHOLDER: real verses come at runtime from Musixmatch
+// richsync (license + no-store rule). We never hardcode lyrics.
 
 import type { MacroNode, Trajectory, TrajectoryShape } from "./types";
 
-// placeholder mostrato finché non c'è il richsync reale
-const VERSE = "il verso sincronizzato arriva qui · Musixmatch richsync";
+// placeholder shown until real richsync is wired
+const VERSE = "the synced line appears here · Musixmatch richsync";
 
 function dist(weights: Partial<Record<MacroNode, number>>) {
   return { weights };
@@ -36,7 +36,7 @@ function track(
   };
 }
 
-// Deep dive: stessa emozione, sempre più dentro. Melancholia R&B/rap verso il nudo.
+// Deep dive: same feeling, ever deeper. R&B/rap melancholy toward the bare core.
 const DEEPEN: Trajectory = {
   shape: "deepen",
   start_distribution: dist({ Melancholia: 0.7, Nostalgia: 0.3 }),
@@ -45,30 +45,30 @@ const DEEPEN: Trajectory = {
       target_distribution: dist({ Melancholia: 0.6, Nostalgia: 0.3, Solitude: 0.1 }),
       ...split(track("Frank Ocean", "Self Control", { Melancholia: 0.6, Nostalgia: 0.3, Solitude: 0.1 }, 60, 80)),
       transition_reason:
-        "Partiamo da dove sei: una malinconia ancora avvolta nel ricordo. Il punto d'ingresso.",
+        "We start where you are: a melancholy still wrapped in memory. The entry point.",
     },
     {
       target_distribution: dist({ Melancholia: 0.5, Solitude: 0.4, Reflection: 0.1 }),
       ...split(track("Drake", "Marvins Room", { Melancholia: 0.5, Solitude: 0.4, Reflection: 0.1 }, 70, 76)),
       transition_reason:
-        "Il ricordo si ritira, resta la solitudine — quella delle chiamate fatte a notte fonda.",
+        "The memory recedes; what's left is solitude — the late-night phone-call kind.",
     },
     {
       target_distribution: dist({ Melancholia: 0.45, Solitude: 0.35, Reflection: 0.2 }),
       ...split(track("SZA", "Nobody Gets Me", { Melancholia: 0.45, Solitude: 0.35, Reflection: 0.2 }, 41, 74)),
       transition_reason:
-        "La solitudine inizia a guardarsi da fuori. Compare la riflessione.",
+        "Solitude starts to look at itself from the outside. Reflection appears.",
     },
     {
       target_distribution: dist({ Reflection: 0.5, Solitude: 0.3, Melancholia: 0.2 }),
       ...split(track("J. Cole", "Love Yourz", { Reflection: 0.5, Solitude: 0.3, Melancholia: 0.2 }, 75, 74)),
       transition_reason:
-        "Il fondo del deep dive: la riflessione che diventa quasi resa, gratitudine nuda. Da qui si vede tutto.",
+        "The bottom of the deep dive: reflection turning into acceptance, bare gratitude. From here you see it all.",
     },
   ],
 };
 
-// Evolution: te ne vai con passi coerenti. Da Melancholia (R&B) → reggaeton → salsa.
+// Evolution: you leave, but in coherent steps. Melancholy (R&B) → reggaeton → salsa.
 const EVOLVE: Trajectory = {
   shape: "evolve",
   start_distribution: dist({ Melancholia: 0.7, Nostalgia: 0.3 }),
@@ -76,36 +76,36 @@ const EVOLVE: Trajectory = {
     {
       target_distribution: dist({ Melancholia: 0.6, Nostalgia: 0.3, Solitude: 0.1 }),
       ...split(track("Frank Ocean", "Self Control", { Melancholia: 0.6, Nostalgia: 0.3, Solitude: 0.1 }, 60, 80)),
-      transition_reason: "Stesso punto d'ingresso: malinconia e ricordo.",
+      transition_reason: "Same entry point: melancholy and memory.",
     },
     {
       target_distribution: dist({ Melancholia: 0.4, Tenderness: 0.3, Solitude: 0.3 }),
       ...split(track("SZA", "Snooze", { Melancholia: 0.4, Tenderness: 0.3, Solitude: 0.3 }, 35, 78)),
       transition_reason:
-        "Primo spostamento: nella malinconia entra una tenerezza. Non un salto, uno scivolamento.",
+        "First shift: a tenderness enters the melancholy. Not a jump — a slide.",
     },
     {
       target_distribution: dist({ Tenderness: 0.5, Hope: 0.3, Joy: 0.2 }),
       ...split(track("Manuel Turizo", "La Bachata", { Tenderness: 0.5, Hope: 0.3, Joy: 0.2 }, 60, 84)),
       transition_reason:
-        "La tenerezza prende ritmo latino e si scalda: arriva la speranza.",
+        "Tenderness picks up a Latin rhythm and warms: hope arrives.",
     },
     {
       target_distribution: dist({ Joy: 0.4, Empowerment: 0.3, Defiance: 0.3 }),
       ...split(track("Bad Bunny", "Tití Me Preguntó", { Joy: 0.4, Empowerment: 0.3, Defiance: 0.3 }, 45, 88)),
       transition_reason:
-        "L'energia sale, il passo si fa deciso — la malinconia è ormai lontana.",
+        "The energy rises, the step turns bold — melancholy is far behind now.",
     },
     {
       target_distribution: dist({ Joy: 0.5, Hope: 0.3, Empowerment: 0.2 }),
       ...split(track("Marc Anthony", "Vivir Mi Vida", { Joy: 0.5, Hope: 0.3, Empowerment: 0.2 }, 55, 84)),
       transition_reason:
-        "Destinazione: gioia piena, una salsa che afferma la vita. Il viaggio dalla malinconia è completo.",
+        "Destination: full joy, a salsa that affirms life. The journey from melancholy is complete.",
     },
   ],
 };
 
-// Helper: separa i campi step-level (verse, ts) dal track candidate.
+// Helper: split step-level fields (verse, ts) from the track candidate.
 function split(t: ReturnType<typeof track>) {
   const { citable_verse, timestamp_in_song, ...rest } = t;
   return { selected_track: rest, citable_verse, timestamp_in_song };
@@ -113,5 +113,5 @@ function split(t: ReturnType<typeof track>) {
 
 export function getMockTrajectory(shape: TrajectoryShape): Trajectory {
   if (shape === "evolve") return EVOLVE;
-  return DEEPEN; // escalate non ancora nei mock → ripiega su deepen
+  return DEEPEN; // escalate not in mocks yet → fall back to deepen
 }

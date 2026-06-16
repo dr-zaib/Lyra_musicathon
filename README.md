@@ -1,23 +1,24 @@
 # Lyra
 
-Discover music by what it actually says. Un agente lyrics-first che ti fa
-muovere in un **atlante di emozioni** (macro-nodi mood/theme) e ti accompagna da
-un sentimento al successivo, citando **il verso** che marca ogni passaggio.
+Discover music by what it actually says. A lyrics-first agent that moves you
+through an **atlas of emotions** (mood/theme macro-nodes) and walks you from one
+feeling to the next, citing the **line** that marks each passage.
 
-## Struttura (monorepo a cartelle)
+## Structure (folder monorepo)
 
 ```
-shared/        Contratto motore <-> agente (fonte di verità cross-team)
-  schema.py      modelli Pydantic — lato Axel
-web/           Frontend Next.js + agent layer — lato Alberto
-  src/lib/types.ts   specchio TS del contratto (stessi nomi snake_case)
-  src/app/api/       SEAM: mock del motore + proxy audio iTunes
-agent/         (Fase 2) Datapizza agent — da costruire
+shared/        Engine <-> agent contract (cross-team source of truth)
+  schema.py      Pydantic models — Axel side
+web/           Next.js frontend + agent layer — Alberto side
+  src/lib/types.ts   TS mirror of the contract (same snake_case names)
+  src/app/api/       SEAM: engine mock + iTunes audio proxy
+backend/       FastAPI service: mock engine + mock agent (swap points in app.py)
+engine/        (Axel) real trajectory engine — to build
 ```
 
-Confini per cartella = niente conflitti git fra i due.
+Folder boundaries = no git conflicts between the two.
 
-## Far girare il frontend
+## Run the frontend
 
 ```bash
 cd web
@@ -25,32 +26,39 @@ npm install
 npm run dev      # http://localhost:3000
 ```
 
-Gira **da solo, senza API key**: l'audio è reale (preview iTunes, pubbliche), la
-traiettoria è mock (fallback se il backend è giù).
+Runs **on its own, without an API key**: audio is real (public iTunes previews),
+the trajectory is mock (fallback when the backend is down).
 
-## Far girare il backend (opzionale in dev)
+## Run the backend
+
+Python env is managed with **uv** (fixed/reproducible). Python is pinned to 3.12
+because datapizza-ai needs `>=3.10,<3.13`.
 
 ```bash
 cd backend
-python -m venv .venv && .venv\Scripts\activate   # Windows
-pip install -r requirements.txt
-uvicorn app:app --reload --port 8010
+uv sync                                  # downloads Python 3.12 + installs locked deps
+uv run uvicorn app:app --reload --port 8010
 ```
 
-Poi in `web/.env.local`: `BACKEND_URL=http://localhost:8010`. Engine e agent sono
-MOCK (`mock_engine.py`, `agent.py`); gli swap point sono in `app.py`.
-NB: l'agente reale (datapizza-ai) richiede **Python >=3.10,<3.13** → venv 3.12.
+Then set `BACKEND_URL=http://localhost:8010` in `web/.env.local`. Engine and agent
+are MOCK (`mock_engine.py`, `agent.py`); swap points are in `app.py`.
 
-## La cucitura (mock -> motore vero)
+No uv? Fallback with plain pip (needs Python 3.12 installed):
+```bash
+py -3.12 -m venv .venv && .venv\Scripts\activate   # Windows
+pip install -r requirements.txt
+```
 
-Oggi `web/src/app/api/trajectory/route.ts` restituisce dati mock
-(`web/src/lib/mockData.ts`) che rispettano il contratto `/shared`. Quando il
-trajectory engine è pronto, quella route diventa un proxy verso il backend
-Python — **stesso shape JSON, il frontend non cambia**.
+## The seam (mock -> real engine)
 
-## Vincolo regole contest (importante)
+Today `web/src/app/api/trajectory/route.ts` proxies the backend and falls back to
+mock data (`web/src/lib/mockData.ts`) that respects the `/shared` contract. When
+the real engine is ready, the backend swaps its import — **same JSON shape, the
+frontend doesn't change**.
 
-Nessun contenuto Musixmatch va persistito: lyrics/richsync/analysis si fetchano
-**real-time per sessione** e si svuotano a fine sessione. Persistibili solo i
-nostri artefatti (embedding dei nomi dei macro-nodi). L'audio NON è contenuto
-Musixmatch (iTunes), quindi è fuori dal vincolo.
+## Contest rule (important)
+
+No Musixmatch content may be persisted: lyrics/richsync/analysis are fetched
+**real-time per session** and wiped at session end. Only our own artifacts are
+persistable (macro-node name embeddings). Audio is NOT Musixmatch content
+(iTunes), so it's outside the constraint.

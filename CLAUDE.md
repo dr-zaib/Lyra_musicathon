@@ -1,80 +1,91 @@
 # CLAUDE.md — Lyra (shared brain)
 
-> Documento vivo letto da **entrambi i Claude Code** del team (Alberto + Axel).
-> Lo aggiorniamo quando prendiamo decisioni o cambiamo stato, così i due agenti
-> condividono lo stesso modello mentale senza scambiarsi MD a mano.
+> Living document read by **both Claude Code agents** on the team (Alberto + Axel).
+> Update it whenever we make a decision or the state changes, so the two agents
+> share the same mental model without passing MD files around by hand.
+> **Everything in this repo — app and docs — is written in English** (accessibility).
 
-## Cos'è Lyra
-Agente musicale lyrics-first per il **Musixmatch Musicathon** (15–21 giu 2026).
-L'utente si muove in un **atlante di emozioni** (macro-nodi mood/theme); Lyra lo
-accompagna da un sentimento al successivo lungo una **traiettoria** e cita **il
-verso** (richsync) che marca ogni passaggio. Modalità unica per il contest:
-**Discover**. (Learn/Memory solo citati nel pitch.)
+## What Lyra is
+A lyrics-first music agent for the **Musixmatch Musicathon** (Jun 15–21, 2026).
+The user moves through an **atlas of emotions** (mood/theme macro-nodes); Lyra
+walks them from one feeling to the next along a **trajectory** and cites the
+**line** (richsync) that marks each passage. Single contest mode: **Discover**.
+(Learn/Memory are only mentioned in the pitch.)
 
-## Team & ownership (confini per cartella → niente conflitti git)
-- **Alberto** → `web/` (frontend Next.js) + agent layer (narrazione) + deploy frontend.
-- **Axel** → `engine/` (traiettorie, ML, soft-mapping, richsync align) + dataset seed + backend Python.
-- **Comune** → `shared/` (il contratto) e questo file.
+## Team & ownership (folder boundaries → no git conflicts)
+- **Alberto** → `web/` (Next.js frontend) + agent layer (narration) + frontend deploy.
+- **Axel** → `engine/` (trajectories, ML, soft-mapping, richsync align) + seed dataset + Python backend.
+- **Shared** → `shared/` (the contract) and this file.
 
-## Architettura runtime (target)
+## Runtime architecture (target)
 ```
-Next (web/, Alberto) ──HTTP──> Backend Python (FastAPI) ──> Musixmatch API
-                                ├─ agent/  (datapizza-ai, narrazione)  ← co-build
-                                └─ engine/ (traiettorie, Axel)
+Next (web/, Alberto) ──HTTP──> Python backend (FastAPI) ──> Musixmatch API
+                                ├─ agent/  (datapizza-ai, narration)  ← co-build
+                                └─ engine/ (trajectories, Axel)
 ```
-Due cuciture: `web → backend` (HTTP, stesso JSON) e `agent ↔ engine` (`shared/`).
-Il backend `backend/` è già in piedi (FastAPI, `POST /recommend`) con **engine e
-agent MOCK** (`backend/mock_engine.py`, `backend/agent.py`). Swap point in
-`app.py`: stasera `mock_engine` → `engine/` reale (Axel), `agent` → datapizza-ai.
-`web/src/app/api/trajectory` proxa il backend via `BACKEND_URL` e **ripiega sul
-mock locale** (`web/src/lib/mockData.ts`) se il backend è giù → la demo non muore mai.
+Two seams: `web → backend` (HTTP, same JSON) and `agent ↔ engine` (`shared/`).
+The `backend/` is up (FastAPI, `POST /recommend`) with **MOCK engine and agent**
+(`backend/mock_engine.py`, `backend/agent.py`). Swap point in `app.py`: tonight
+`mock_engine` → real `engine/` (Axel), `agent` → datapizza-ai.
+`web/src/app/api/trajectory` proxies the backend via `BACKEND_URL` and **falls
+back to the local mock** (`web/src/lib/mockData.ts`) if the backend is down → the
+demo never dies.
 
-⚠️ **Python**: datapizza-ai richiede **>=3.10,<3.13**. Il sistema ha 3.14 → per il
-backend reale (con l'agente) creare un **venv 3.12**. Il mock attuale gira su 3.14.
+## Python environment (fixed / reproducible)
+Managed with **uv**. Python is pinned to **3.12** (`.python-version`) because
+datapizza-ai requires `>=3.10,<3.13` (the dev machine has 3.14). The exact set of
+packages is locked in `uv.lock`; `requirements.txt` is an exported pinned fallback.
+- Setup (both machines): `cd backend && uv sync` — uv downloads Python 3.12 and
+  installs the locked deps. Identical environment for everyone.
+- Run: `uv run uvicorn app:app --reload --port 8010`.
+- Add a package: `uv add <pkg>` (updates `pyproject.toml` + `uv.lock`), then
+  `uv export --no-hashes --no-dev -o requirements.txt` to refresh the fallback.
+- datapizza-ai 0.1.0 is verified to install on 3.12.
 
-## Il contratto
-`shared/schema.py` (Pydantic, lato Axel) ↔ `web/src/lib/types.ts` (lato Alberto),
-**identici campo per campo, snake_case**. La risposta `model_dump()` di Pydantic
-entra nel frontend senza conversioni. Se cambi un campo, cambialo in entrambi.
+## The contract
+`shared/schema.py` (Pydantic, Axel side) ↔ `web/src/lib/types.ts` (Alberto side),
+**field-for-field identical, snake_case**. Pydantic's `model_dump()` drops straight
+into the frontend with no conversion. If you change a field, change it in both.
 
-## Decisione agent (datapizza-ai)
-Framework giovane (v0.0.x) → tenerlo in **ruolo a basso rischio**:
-- **Engine (deterministico)** produce i dati strutturati `Trajectory`.
-- **Agent (LLM, claude-sonnet-4-6)** fa solo linguaggio: intent → `seed_mood`+`shape`,
-  e genera `transition_reason` citando `citable_verse`. NON emette la Trajectory.
-- Fallback se datapizza combatte: SDK Anthropic diretto (switch a basso costo).
-- L'agente è un **co-build Alberto+Axel** in una session dedicata.
+## Agent decision (datapizza-ai)
+Young framework (v0.x) → keep it in a **low-risk role**:
+- **Engine (deterministic)** produces the structured `Trajectory` data.
+- **Agent (LLM, claude-sonnet-4-6)** does language only: intent → `seed_mood`+`shape`,
+  and generates `transition_reason` citing `citable_verse`. It does NOT emit the Trajectory.
+- Fallback if datapizza fights us: the Anthropic SDK directly (low switch cost).
+- The agent is a **co-build (Alberto+Axel)** in a dedicated session.
 
-## Vincoli regole contest (NON violare)
-- **No storage persistente di contenuto Musixmatch** (lyrics/richsync/analysis):
-  fetch real-time per sessione, si svuota a fine sessione. Niente vector DB di liriche.
-  Persistibili solo i nostri artefatti (es. embedding dei nomi dei macro-nodi).
-  L'audio è iTunes/Deezer (NON Musixmatch) → fuori dal vincolo.
-- **Obbligatorio usare ≥1 surface API Musixmatch** in modo significativo.
-- **Giudizio**: Originality 25% · Craft 25% · Use of Musixmatch API 25% · Impact 25%.
-- **Deadline submission: 21 giu 2026, 23:59 CEST** (le regole si contraddicono sul 22 → usiamo il 21 come muro).
-- **Submission**: repo pubblico + (demo URL *o* video 90s) + cover image + titolo/one-liner/descrizione.
+## Contest rules (do NOT violate)
+- **No persistent storage of Musixmatch content** (lyrics/richsync/analysis):
+  fetch real-time per session, wipe at session end. No lyrics vector DB.
+  Only our own artifacts are persistable (e.g. macro-node name embeddings).
+  Audio is iTunes/Deezer (NOT Musixmatch) → outside the constraint.
+- **Must use ≥1 Musixmatch API surface** in a meaningful way.
+- **Judging**: Originality 25% · Craft 25% · Use of Musixmatch API 25% · Impact 25%.
+- **Submission deadline: Jun 21, 2026, 23:59 CEST** (rules contradict themselves on the 22nd → treat the 21st as the wall).
+- **Submission**: public repo + (demo URL *or* 90s video) + cover image + title/one-liner/description.
 
-## Stato attuale
-- ✅ Scaffold `web/` (Next 16 + TS + Tailwind v4) su `main`.
-- ✅ Discover skeleton funzionante: MoodPicker → atlante SVG → step card (verso citato) → player con auto-avanzamento. **Audio iTunes reale**, traiettoria mock.
-- ✅ Contratto `shared/schema.py` + `web/src/lib/types.ts`.
-- ✅ Backend FastAPI (`backend/`) con engine+agent MOCK; seam Next→backend provata end-to-end.
-- ✅ Atlante interattivo + verso "karaoke" sincronizzato all'audio.
-- ⏳ Agent (datapizza) + engine reali: da costruire (agent stasera, co-build).
+## Current state
+- ✅ `web/` scaffold (Next 16 + TS + Tailwind v4) on `main`.
+- ✅ Working Discover skeleton: MoodPicker → circumplex wheel → step card (cited line) → player with auto-advance. **Real iTunes audio**, mock trajectory.
+- ✅ Contract `shared/schema.py` + `web/src/lib/types.ts`.
+- ✅ FastAPI backend (`backend/`) with MOCK engine+agent; Next→backend seam verified end-to-end.
+- ✅ Interactive emotional wheel + "karaoke" line synced to audio (Motion).
+- ✅ Fixed Python env via uv (3.12 + uv.lock); datapizza-ai install validated.
+- ⏳ Real agent (datapizza) + engine: to build (agent tonight, co-build).
 
-## Come lavoriamo
-- Si lavora su `main` (processo leggero, niente cerimonia PR). Branch corti solo se serve.
-- Tenere `main` sempre demoabile.
-- **Aggiornare questo file** quando si decide qualcosa o cambia lo stato.
+## How we work
+- Work on `main` (light process, no PR ceremony). Short branches only if needed.
+- Keep `main` always demoable.
+- **Update this file** when something is decided or the state changes.
 
 ## Decision log
-- **2026-06-16** — Architettura a grafo discreto (no vector DB) confermata; ruolo agent definito (engine=dati, agent=narrazione); scaffold frontend mergiato su main; audio via iTunes preview.
-- **2026-06-16** — Backend FastAPI scaffoldato con engine+agent MOCK e swap point; proxy Next→backend con fallback; trovato vincolo Python <3.13 per datapizza-ai (sistema 3.14 → serve venv 3.12).
+- **2026-06-16** — Discrete-graph architecture (no vector DB) confirmed; agent role defined (engine=data, agent=narration); frontend scaffold merged to main; audio via iTunes preview.
+- **2026-06-16** — FastAPI backend scaffolded with MOCK engine+agent and swap point; Next→backend proxy with fallback; found Python <3.13 constraint for datapizza-ai.
+- **2026-06-16** — Fixed/reproducible env adopted via uv (Python 3.12 pinned, uv.lock); datapizza-ai 0.1.0 verified on 3.12. Repo language: English only (app + docs).
 
 ## Next moves
-- WS-C (Alberto, in corso): graph interattiva + legenda + sync del verso sull'audio.
-- WS-A (Alberto+Axel, session): costruire l'agente datapizza-ai.
-- WS-D (Axel): engine reale che riempie il contratto.
-- WS-E (comune, post-key): validare `track.lyrics.analysis.search` come gate bloccante.
-- Deploy: backend Replit, frontend Vercel/Replit. Pitch + cover + video entro il 21.
+- WS-A (Alberto+Axel, session): build the datapizza-ai agent.
+- WS-D (Axel): real engine filling the contract.
+- WS-E (shared, post-key): validate `track.lyrics.analysis.search` as a blocking gate.
+- Deploy: backend on Replit, frontend on Vercel/Replit. Pitch + cover + video by the 21st.
