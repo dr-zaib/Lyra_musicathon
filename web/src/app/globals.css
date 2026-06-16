@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0a0f;
+  --bg-elev: #14141c;
+  --bg-elev-2: #1c1c28;
+  --fg: #ece9f5;
+  --muted: #8b88a0;
+  --muted-2: #5d5b70;
+  --accent: #e8b54a;
+  --accent-soft: #e8b54a22;
+  --border: #ffffff14;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elev: var(--bg-elev);
+  --color-bg-elev-2: var(--bg-elev-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* atmosfera: leggera nebbia radiale in alto */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    1200px 600px at 50% -10%,
+    #2a2350aa,
+    transparent 70%
+  );
+  z-index: 0;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.4s ease both;
+}
