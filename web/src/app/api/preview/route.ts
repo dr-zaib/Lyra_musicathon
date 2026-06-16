@@ -28,13 +28,21 @@ export async function GET(req: Request) {
   }
 
   const term = encodeURIComponent(`${artist} ${title}`);
-  const url = `https://itunes.apple.com/search?term=${term}&media=music&entity=song&limit=1`;
+  const url = `https://itunes.apple.com/search?term=${term}&media=music&entity=song&limit=5`;
 
   try {
     const res = await fetch(url, { next: { revalidate: 3600 } });
     if (!res.ok) throw new Error(`iTunes ${res.status}`);
     const data = (await res.json()) as { results: ItunesResult[] };
-    const hit = data.results?.[0];
+    const results = data.results ?? [];
+
+    // preferisci il risultato il cui artista combacia (evita cover/omonimi),
+    // poi qualsiasi con preview. Il prodotto reale userà ISRC via Musixmatch.
+    const wanted = artist.toLowerCase();
+    const hit =
+      results.find(
+        (r) => r.previewUrl && (r.artistName ?? "").toLowerCase().includes(wanted),
+      ) ?? results.find((r) => r.previewUrl);
 
     if (!hit?.previewUrl) {
       return NextResponse.json({ preview_url: null, artwork_url: null });
