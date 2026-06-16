@@ -1,8 +1,8 @@
-// Lyra — contratto motore <-> agente <-> frontend (lato TS).
+// Lyra — engine <-> agent <-> frontend contract (TS side).
 //
-// Specchio 1:1 di `shared/schema.py` (fonte di verità cross-team). Stessi nomi
-// snake_case del wire JSON, così la risposta Pydantic del backend di Axel entra
-// qui senza conversioni. Se cambi un campo qui, cambialo anche in schema.py.
+// 1:1 mirror of `shared/schema.py` (cross-team source of truth). Same snake_case
+// names as the wire JSON, so Axel's Pydantic backend response drops in here with
+// no conversion. If you change a field here, change it in schema.py too.
 
 export type MacroNode =
   | "Melancholia"
@@ -21,7 +21,7 @@ export type MacroNode =
 export type TrajectoryShape = "deepen" | "evolve" | "escalate";
 
 export interface NodeDistribution {
-  // macro-node name -> peso, normalizzato a somma 1
+  // macro-node name -> weight, normalized to sum 1
   weights: Partial<Record<MacroNode, number>>;
 }
 
@@ -36,7 +36,7 @@ export interface TrackCandidate {
   track_rating: number;
   similarity_score?: number | null;
 
-  // Arricchimento a runtime (aggiunto dal frontend via iTunes Search, non dal motore).
+  // Runtime enrichment (added by the frontend via iTunes Search, not the engine).
   preview_url?: string | null;
   artwork_url?: string | null;
 }

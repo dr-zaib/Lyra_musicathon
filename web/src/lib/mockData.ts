@@ -49,9 +49,9 @@ const DEEPEN: Trajectory = {
     },
     {
       target_distribution: dist({ Melancholia: 0.5, Solitude: 0.4, Reflection: 0.1 }),
-      ...split(track("Drake", "Marvins Room", { Melancholia: 0.5, Solitude: 0.4, Reflection: 0.1 }, 70, 76)),
+      ...split(track("Drake", "Passionfruit", { Melancholia: 0.5, Solitude: 0.4, Reflection: 0.1 }, 70, 76)),
       transition_reason:
-        "The memory recedes; what's left is solitude — the late-night phone-call kind.",
+        "The memory recedes; what's left is solitude — the ache of distance.",
     },
     {
       target_distribution: dist({ Melancholia: 0.45, Solitude: 0.35, Reflection: 0.2 }),

@@ -1,44 +1,45 @@
 """
-MOCK agent — placeholder della narrazione.
+MOCK agent — narration placeholder.
 
-Rappresenta il ruolo dell'agente (datapizza-ai, claude-sonnet-4-6): prende lo
-scheletro `Trajectory` dall'engine e ne scrive il linguaggio — il `transition_reason`
-di ogni step, citando il `citable_verse`. Qui i testi sono canned; stasera questo
-file diventa l'agente vero (intent -> seed/shape, narrazione generata dall'LLM).
+Represents the agent's role (datapizza-ai, claude-sonnet-4-6): it takes the
+`Trajectory` skeleton from the engine and writes its language — each step's
+`transition_reason`, citing the `citable_verse`. Here the texts are canned;
+tonight this file becomes the real agent (intent -> seed/shape, LLM-generated
+narration).
 
-Tenere l'LLM SOLO sul testo (non sui dati strutturati) è la scelta di design:
-i dati vengono dall'engine, il framework giovane sta su un compito a basso rischio.
+Keeping the LLM on text ONLY (not on the structured data) is the design choice:
+data comes from the engine, the young framework stays on a low-risk task.
 """
 
 from schema import Trajectory
 
-# narrazione mock per (artist, title) -> reason
+# mock narration per (artist, title) -> reason
 _NARRATION = {
     ("Frank Ocean", "Self Control"):
-        "Partiamo da dove sei: una malinconia ancora avvolta nel ricordo. Il punto d'ingresso.",
-    ("Drake", "Marvins Room"):
-        "Il ricordo si ritira, resta la solitudine — quella delle chiamate fatte a notte fonda.",
+        "We start where you are: a melancholy still wrapped in memory. The entry point.",
+    ("Drake", "Passionfruit"):
+        "The memory recedes; what's left is solitude — the ache of distance.",
     ("SZA", "Nobody Gets Me"):
-        "La solitudine inizia a guardarsi da fuori. Compare la riflessione.",
+        "Solitude starts to look at itself from the outside. Reflection appears.",
     ("J. Cole", "Love Yourz"):
-        "Il fondo del deep dive: la riflessione che diventa quasi resa, gratitudine nuda. Da qui si vede tutto.",
+        "The bottom of the deep dive: reflection turning into acceptance, bare gratitude. From here you see it all.",
     ("SZA", "Snooze"):
-        "Primo spostamento: nella malinconia entra una tenerezza. Non un salto, uno scivolamento.",
+        "First shift: a tenderness enters the melancholy. Not a jump — a slide.",
     ("Manuel Turizo", "La Bachata"):
-        "La tenerezza prende ritmo latino e si scalda: arriva la speranza.",
+        "Tenderness picks up a Latin rhythm and warms: hope arrives.",
     ("Bad Bunny", "Tití Me Preguntó"):
-        "L'energia sale, il passo si fa deciso — la malinconia è ormai lontana.",
+        "The energy rises, the step turns bold — melancholy is far behind now.",
     ("Marc Anthony", "Vivir Mi Vida"):
-        "Destinazione: gioia piena, una salsa che afferma la vita. Il viaggio dalla malinconia è completo.",
+        "Destination: full joy, a salsa that affirms life. The journey from melancholy is complete.",
 }
 
 
 def narrate(trajectory: Trajectory) -> Trajectory:
-    """Riempie transition_reason per ogni step (mock dell'output LLM)."""
+    """Fill transition_reason for each step (mock of the LLM output)."""
     for step in trajectory.steps:
         t = step.selected_track
         step.transition_reason = _NARRATION.get(
             (t.artist, t.title),
-            f"Passaggio verso {t.title}.",
+            f"Passage toward {t.title}.",
         )
     return trajectory

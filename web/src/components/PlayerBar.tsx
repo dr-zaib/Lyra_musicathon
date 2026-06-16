@@ -1,7 +1,7 @@
 "use client";
 
-// Player sticky in basso. Riproduce la preview da 30s (iTunes). L'<audio> reale
-// vive in SessionView; qui è solo presentazione + controlli.
+// Sticky bottom player. Plays the 30s preview (iTunes). The real <audio> lives in
+// SessionView; this is presentation + controls only.
 
 import type { TrackCandidate } from "@/lib/types";
 

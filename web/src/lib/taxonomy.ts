@@ -1,17 +1,16 @@
-// Lyra — tassonomia dei macro-nodi emotivi.
+// Lyra — emotional macro-node taxonomy.
 //
-// Posizioni su un piano stile circumplex di Russell: x = valenza (neg -> pos),
-// y = intensità/arousal (bassa -> alta). Servono alla graph view per disporre
-// i nodi in modo che "deep dive" (resti, ti restringi) ed "evolve" (ti sposti)
-// abbiano un significato spaziale leggibile a colpo d'occhio.
+// Positions on a Russell-circumplex-style plane: x = valence (neg -> pos),
+// y = intensity/arousal (low -> high). Used by the graph view to lay the nodes
+// out so that "deep dive" (stay, narrow in) and "evolve" (move) read spatially.
 
 import type { MacroNode } from "./types";
 
 export interface NodeMeta {
   name: MacroNode;
-  x: number; // 0..1  valenza
-  y: number; // 0..1  intensità
-  color: string; // hue emotiva
+  x: number; // 0..1  valence
+  y: number; // 0..1  intensity
+  color: string; // emotional hue
 }
 
 export const TAXONOMY: Record<MacroNode, NodeMeta> = {
@@ -31,7 +30,7 @@ export const TAXONOMY: Record<MacroNode, NodeMeta> = {
 
 export const ALL_NODES: NodeMeta[] = Object.values(TAXONOMY);
 
-/** Nodo dominante di una distribuzione (peso massimo). */
+/** Dominant node of a distribution (max weight). */
 export function dominantNode(weights: Partial<Record<MacroNode, number>>): MacroNode {
   let best: MacroNode = "Melancholia";
   let bestW = -1;
@@ -44,7 +43,7 @@ export function dominantNode(weights: Partial<Record<MacroNode, number>>): Macro
   return best;
 }
 
-/** Centroide pesato sul piano (per disegnare la posizione corrente nella mappa). */
+/** Weighted centroid on the plane (to draw the current position on the map). */
 export function centroid(weights: Partial<Record<MacroNode, number>>): {
   x: number;
   y: number;

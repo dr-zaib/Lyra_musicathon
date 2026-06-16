@@ -1,12 +1,12 @@
-// GET /api/preview?artist=...&title=...  — audio preview reale via iTunes Search API.
+// GET /api/preview?artist=...&title=...  — real audio preview via the iTunes Search API.
 //
-// Pubblica, senza auth, NON contenuto Musixmatch -> nessun problema con le regole
-// del contest sullo storage. Ritorna l'URL della preview da 30s + artwork.
-// Questo è già "vero" stasera, non è un mock.
+// Public, no auth, NOT Musixmatch content -> no conflict with the contest's
+// storage rule. Returns the 30s preview URL + artwork. This is already "real",
+// not a mock.
 
 import { NextResponse } from "next/server";
 
-export const revalidate = 3600; // cache 1h, gli URL preview sono stabili
+export const revalidate = 3600; // cache 1h, preview URLs are stable
 
 interface ItunesResult {
   previewUrl?: string;
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
 
   if (!artist || !title) {
     return NextResponse.json(
-      { error: "artist e title richiesti" },
+      { error: "artist and title required" },
       { status: 400 },
     );
   }
@@ -36,8 +36,8 @@ export async function GET(req: Request) {
     const data = (await res.json()) as { results: ItunesResult[] };
     const results = data.results ?? [];
 
-    // preferisci il risultato il cui artista combacia (evita cover/omonimi),
-    // poi qualsiasi con preview. Il prodotto reale userà ISRC via Musixmatch.
+    // prefer the result whose artist matches (avoids covers / namesakes),
+    // then any with a preview. The real product will use ISRC via Musixmatch.
     const wanted = artist.toLowerCase();
     const hit =
       results.find(
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ preview_url: null, artwork_url: null });
     }
 
-    // artwork a risoluzione più alta (iTunes torna 100x100 di default)
+    // higher-res artwork (iTunes returns 100x100 by default)
     const artwork = hit.artworkUrl100?.replace("100x100bb", "600x600bb") ?? null;
 
     return NextResponse.json({

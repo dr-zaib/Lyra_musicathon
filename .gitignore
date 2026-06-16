@@ -4,7 +4,7 @@ __pycache__/
 .venv/
 .env
 
-# Node / Next (web/ ha anche il suo .gitignore)
+# Node / Next (web/ has its own .gitignore too)
 node_modules/
 .next/
 .env.local

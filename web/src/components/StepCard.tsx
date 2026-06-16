@@ -1,11 +1,11 @@
 "use client";
 
-// La card del passo corrente: copertina, brano, la spiegazione dell'agente e —
-// il cuore di Lyra — il verso citato che marca questo passaggio emotivo.
+// The current step card: artwork, track, the agent's explanation and — the heart
+// of Lyra — the cited line that marks this emotional passage.
 //
-// Il verso è reso "karaoke": le parole si illuminano in sequenza mentre l'audio
-// suona. È un PLACEHOLDER dell'esperienza richsync: con i timestamp word-level
-// veri (track.richsync.get) la sweep userà i tempi reali invece di un loop.
+// The line is rendered "karaoke": words light up in sequence as the audio plays.
+// It's a PLACEHOLDER for the richsync experience: with real word-level timestamps
+// (track.richsync.get) the sweep will use real timing instead of a loop.
 
 import Image from "next/image";
 
@@ -38,7 +38,7 @@ export default function StepCard({
   );
   const stamp = fmt(step.timestamp_in_song);
 
-  // karaoke: posizione 0..1 nel loop -> indice parola attiva
+  // karaoke: position 0..1 within the loop -> active word index
   const words = step.citable_verse ? step.citable_verse.split(" ") : [];
   const loopSec = Math.max(4, words.length * 0.5);
   const pos = isPlaying ? (currentTime % loopSec) / loopSec : 1;
@@ -89,12 +89,12 @@ export default function StepCard({
         </div>
       </div>
 
-      {/* voce dell'agente */}
+      {/* the agent's voice */}
       <p className="mt-5 text-[15px] leading-relaxed text-fg/90">
         {step.transition_reason}
       </p>
 
-      {/* il verso citato — il momento richsync, reso karaoke */}
+      {/* the cited line — the richsync moment, rendered karaoke */}
       {step.citable_verse && (
         <figure className="mt-4 rounded-xl border border-accent/30 bg-accent/10 p-4">
           <div className="mb-1.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-accent/80">

@@ -1,9 +1,9 @@
 "use client";
 
-// La ruota emotiva: le 12 emozioni disposte in cerchio (circumplex di Russell —
-// valenza/arousal), il viaggio tracciato come un filo di luce che attraversa la
-// ruota, la posizione corrente che pulsa. Sobrio: geometria pulita, glow viola,
-// nessun orpello. È il visual-hero del demo.
+// The emotional wheel: the 12 emotions arranged in a circle (Russell's circumplex
+// — valence/arousal), the journey traced as a thread of light across the wheel,
+// the current position pulsing. Sober: clean geometry, violet glow, no clutter.
+// It's the demo's hero visual.
 
 import { motion } from "motion/react";
 import { useMemo } from "react";
@@ -13,10 +13,10 @@ import type { MacroNode, Trajectory } from "@/lib/types";
 
 const CX = 50;
 const CY = 50;
-const R = 34; // raggio della ruota
+const R = 34; // wheel radius
 
-// ordine attorno al cerchio (circumplex): caldo/positivo a destra, alta energia
-// in alto, negativo a sinistra, introspettivo in basso.
+// order around the circle (circumplex): warm/positive on the right, high energy
+// at the top, negative on the left, introspective at the bottom.
 const WHEEL_ORDER: MacroNode[] = [
   "Tenderness", "Hope", "Joy", "Empowerment",
   "Awe", "Defiance", "Anger", "Anxiety",
@@ -32,8 +32,8 @@ function rimPos(name: MacroNode, radius = R) {
   return { x: CX + radius * Math.cos(rad), y: CY - radius * Math.sin(rad) };
 }
 
-// punto della traiettoria = combinazione convessa delle posizioni sulla ruota
-// (concentrato su un'emozione → vicino al suo nodo; misto → verso il centro).
+// trajectory point = convex combination of the positions on the wheel
+// (concentrated on one emotion -> near its node; mixed -> toward the center).
 function stepPos(weights: Partial<Record<MacroNode, number>>) {
   let x = 0, y = 0, tot = 0;
   for (const [n, w] of Object.entries(weights) as [MacroNode, number][]) {
@@ -86,13 +86,13 @@ export default function EmotionalAtlas({
           </linearGradient>
         </defs>
 
-        {/* cerchi guida (arousal) */}
+        {/* guide circles (arousal) */}
         {[R, R * 0.62, R * 0.28].map((r) => (
           <circle key={r} cx={CX} cy={CY} r={r} fill="none"
             stroke="var(--border)" strokeWidth={0.4} />
         ))}
 
-        {/* nodi emozione sulla ruota */}
+        {/* emotion nodes on the wheel */}
         {WHEEL_ORDER.map((name) => {
           const p = rimPos(name);
           const lp = rimPos(name, R + 7);
@@ -117,7 +117,7 @@ export default function EmotionalAtlas({
           );
         })}
 
-        {/* filo del viaggio */}
+        {/* the journey thread */}
         {pathD && (
           <motion.path
             key={trajectory?.shape}
@@ -132,7 +132,7 @@ export default function EmotionalAtlas({
           />
         )}
 
-        {/* waypoint */}
+        {/* waypoints */}
         {points.map((p, i) => (
           <circle key={i} cx={p.x} cy={p.y} r={i <= currentIndex ? 1.5 : 1}
             fill={i <= currentIndex ? "var(--accent)" : "var(--muted-2)"}
@@ -143,7 +143,7 @@ export default function EmotionalAtlas({
           </circle>
         ))}
 
-        {/* posizione corrente */}
+        {/* current position */}
         {current && (
           <>
             <motion.circle

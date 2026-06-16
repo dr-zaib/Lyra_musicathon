@@ -1,8 +1,8 @@
 "use client";
 
-// Orchestratore del frontend: tiene lo stato di sessione, l'elemento <audio>
-// reale, e fa il fetch di traiettoria (mock) + preview audio (iTunes, vere).
-// MoodPicker -> loading -> sessione che suona e si auto-avanza.
+// Frontend orchestrator: holds session state, the real <audio> element, and
+// fetches the trajectory (mock) + audio previews (iTunes, real).
+// MoodPicker -> loading -> a session that plays and auto-advances.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -74,7 +74,7 @@ export default function SessionView() {
     [],
   );
 
-  // carica e riproduce il brano corrente a ogni cambio di step
+  // load and play the current track on every step change
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !trajectory) return;
@@ -88,7 +88,7 @@ export default function SessionView() {
     audio
       .play()
       .then(() => setIsPlaying(true))
-      .catch(() => setIsPlaying(false)); // autoplay bloccato -> mostra play
+      .catch(() => setIsPlaying(false)); // autoplay blocked -> show play button
   }, [index, trajectory]);
 
   const steps = trajectory?.steps ?? [];

@@ -1,16 +1,15 @@
 """
-Lyra — Contratto condiviso motore <-> agente.
+Lyra — shared engine <-> agent contract.
 
-Questa è la fonte di verità del contratto fra il trajectory engine (Axel)
-e l'agent layer / frontend (Alberto). Bozza basata sul doc di build di Axel.
+Source of truth for the contract between the trajectory engine (Axel) and the
+agent layer / frontend (Alberto). Draft based on Axel's build doc.
 
-NB sul wire format: il JSON HTTP usa gli STESSI nomi snake_case di questi
-modelli (nessuna trasformazione camelCase). Il frontend TS in `web/src/lib/types.ts`
-rispecchia esattamente questi campi, così `model_dump()` di Pydantic finisce
-dritto nel frontend senza layer di conversione.
+Wire format note: the HTTP JSON uses these exact snake_case names (no camelCase
+conversion). The TS frontend in `web/src/lib/types.ts` mirrors these fields, so
+Pydantic's `model_dump()` drops straight into the frontend with no conversion layer.
 
-Vincolo regole contest: nessun contenuto Musixmatch viene persistito. Questi
-oggetti vivono in memoria per-sessione e si svuotano a fine sessione.
+Contest rule: no Musixmatch content is persisted. These objects live in memory
+per session and are wiped at session end.
 """
 
 from __future__ import annotations
@@ -20,8 +19,8 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-# I macro-nodi (tassonomia nostra, fissa). Vedi web/src/lib/taxonomy.ts per
-# coordinate e colori usati dalla graph view.
+# The macro-nodes (our fixed taxonomy). See web/src/lib/taxonomy.ts for the
+# coordinates and colors used by the graph view.
 MacroNode = Literal[
     "Melancholia",
     "Reflection",
@@ -41,7 +40,7 @@ TrajectoryShape = Literal["deepen", "evolve", "escalate"]
 
 
 class NodeDistribution(BaseModel):
-    """Distribuzione di pesi sui macro-nodi (normalizzata, somma = 1)."""
+    """Weight distribution over the macro-nodes (normalized, sums to 1)."""
 
     weights: dict[str, float] = Field(default_factory=dict)
 
@@ -54,11 +53,11 @@ class TrackCandidate(BaseModel):
     spotify_id: str | None = None
     distribution: NodeDistribution
     has_richsync: bool = False
-    track_rating: int = 0  # proxy popolarità
-    similarity_score: float | None = None  # da track.lyrics.analysis.search
+    track_rating: int = 0  # popularity proxy
+    similarity_score: float | None = None  # from track.lyrics.analysis.search
 
-    # Arricchimento a runtime (NON dal motore — aggiunto dal frontend via iTunes).
-    # Inclusi nel contratto solo per documentare la forma finale dell'oggetto.
+    # Runtime enrichment (NOT from the engine — added by the frontend via iTunes).
+    # Included in the contract only to document the final shape of the object.
     preview_url: str | None = None
     artwork_url: str | None = None
 
@@ -66,9 +65,9 @@ class TrackCandidate(BaseModel):
 class TrajectoryStep(BaseModel):
     target_distribution: NodeDistribution
     selected_track: TrackCandidate
-    transition_reason: str  # linguaggio naturale, la voce dell'agente
-    citable_verse: str | None = None  # da track.richsync.get
-    timestamp_in_song: float | None = None  # secondi, per il jump richsync
+    transition_reason: str  # natural language, the agent's voice
+    citable_verse: str | None = None  # from track.richsync.get
+    timestamp_in_song: float | None = None  # seconds, for the richsync jump
 
 
 class Trajectory(BaseModel):

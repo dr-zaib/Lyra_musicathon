@@ -1,7 +1,7 @@
-// POST /api/trajectory  — restituisce una traiettoria.
+// POST /api/trajectory  — returns a trajectory.
 //
-// SEAM: prova il backend Python (BACKEND_URL); se non configurato o irraggiungibile,
-// ripiega sul mock locale -> la demo non muore mai. Stesso shape JSON in entrambi i casi.
+// SEAM: tries the Python backend (BACKEND_URL); if unset or unreachable, falls
+// back to the local mock -> the demo never dies. Same JSON shape either way.
 
 import { NextResponse } from "next/server";
 
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    // body vuoto -> default
+    // empty body -> defaults
   }
 
   const shape = body.shape ?? "deepen";
@@ -31,10 +31,10 @@ export async function POST(req: Request) {
       });
       if (res.ok) return NextResponse.json(await res.json());
     } catch {
-      // backend giù -> fallback al mock
+      // backend down -> fall back to mock
     }
   }
 
-  await new Promise((r) => setTimeout(r, 300)); // simula latenza per gli stati UI
+  await new Promise((r) => setTimeout(r, 300)); // simulate latency for UI states
   return NextResponse.json(getMockTrajectory(shape));
 }

@@ -1,15 +1,15 @@
 "use client";
 
-// Schermata d'ingresso: "come ti senti?" -> scegli un mood seed e una direzione.
-// La direzione (deepen/evolve) è la forma di traiettoria che guida il viaggio.
+// Entry screen: "how do you feel?" -> pick a seed mood and a direction.
+// The direction (deepen/evolve) is the trajectory shape that drives the journey.
 
 import { useState } from "react";
 
 import { ALL_NODES } from "@/lib/taxonomy";
 import type { MacroNode, TrajectoryShape } from "@/lib/types";
 
-// Per lo skeleton i dati mock partono da una zona malinconica: questi seed sono
-// quelli coerenti con i viaggi autorati. Gli altri restano visibili ma soft.
+// For the skeleton the mock data starts in a melancholic zone: these seeds are
+// the ones coherent with the authored journeys. The others stay visible but soft.
 const SUGGESTED: MacroNode[] = ["Melancholia", "Nostalgia", "Solitude"];
 
 export default function MoodPicker({

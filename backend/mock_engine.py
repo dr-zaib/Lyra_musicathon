@@ -1,12 +1,12 @@
 """
-MOCK trajectory engine — placeholder deterministico (parte di Axel).
+MOCK trajectory engine — deterministic placeholder (Axel's part).
 
-Produce lo scheletro `Trajectory` (dati strutturati + verso), NON il
-`transition_reason` (compito dell'agente). Stasera si sostituisce con l'engine
-reale in `engine/` — `app.py` cambia solo l'import.
+Produces the `Trajectory` skeleton (structured data + verse), NOT the
+`transition_reason` (the agent's job). Tonight it's replaced by the real engine
+in `engine/` — `app.py` only changes the import.
 
-Canzoni reali (audio iTunes lato frontend), palette black music. I `citable_verse`
-sono PLACEHOLDER: i versi veri arrivano da Musixmatch richsync a runtime.
+Real songs (iTunes audio on the frontend), black-music palette. `citable_verse`
+is a PLACEHOLDER: real verses come from Musixmatch richsync at runtime.
 """
 
 from schema import (
@@ -16,8 +16,8 @@ from schema import (
     TrajectoryStep,
 )
 
-# placeholder finché non c'è il richsync reale (no lyrics hardcoded)
-VERSE = "il verso sincronizzato arriva qui · Musixmatch richsync"
+# placeholder until real richsync is wired (no hardcoded lyrics)
+VERSE = "the synced line appears here · Musixmatch richsync"
 
 _next_id = 1000
 
@@ -40,7 +40,7 @@ def _step(weights, track_tuple):
     return TrajectoryStep(
         target_distribution=NodeDistribution(weights=weights),
         selected_track=track,
-        transition_reason="",  # lo riempie l'agente
+        transition_reason="",  # filled by the agent
         citable_verse=VERSE,
         timestamp_in_song=ts,
     )
@@ -54,7 +54,7 @@ def _deepen() -> Trajectory:
             _step({"Melancholia": 0.6, "Nostalgia": 0.3, "Solitude": 0.1},
                   _track("Frank Ocean", "Self Control", {"Melancholia": 0.6, "Nostalgia": 0.3, "Solitude": 0.1}, 60, 80)),
             _step({"Melancholia": 0.5, "Solitude": 0.4, "Reflection": 0.1},
-                  _track("Drake", "Marvins Room", {"Melancholia": 0.5, "Solitude": 0.4, "Reflection": 0.1}, 70, 76)),
+                  _track("Drake", "Passionfruit", {"Melancholia": 0.5, "Solitude": 0.4, "Reflection": 0.1}, 70, 76)),
             _step({"Melancholia": 0.45, "Solitude": 0.35, "Reflection": 0.2},
                   _track("SZA", "Nobody Gets Me", {"Melancholia": 0.45, "Solitude": 0.35, "Reflection": 0.2}, 41, 74)),
             _step({"Reflection": 0.5, "Solitude": 0.3, "Melancholia": 0.2},
@@ -83,7 +83,7 @@ def _evolve() -> Trajectory:
 
 
 def build_trajectory(seed_mood: str, shape: str) -> Trajectory:
-    """Interfaccia che l'engine reale deve implementare."""
+    """Interface the real engine must implement."""
     if shape == "evolve":
         return _evolve()
     return _deepen()
