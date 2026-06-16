@@ -5,9 +5,6 @@
 //  - variant "panel"    → desktop split (bordered card)
 //  - variant "floating" → mobile living-background (frosted, over the scrim)
 
-import Image from "next/image";
-
-import { TAXONOMY } from "@/lib/taxonomy";
 import type { MacroNode, Trajectory } from "@/lib/types";
 
 export type Msg = { role: "agent" | "user"; text: string };
@@ -18,37 +15,30 @@ export default function ConversationPanel({
   comprehension,
   seed,
   trajectory,
-  index,
-  isPlaying,
   draft,
   setDraft,
   onSubmit,
   onDeepen,
   onEvolve,
-  onSelectTrack,
 }: {
   variant: "panel" | "floating";
   messages: Msg[];
   comprehension: number;
   seed: MacroNode | null;
   trajectory: Trajectory | null;
-  index: number;
-  isPlaying: boolean;
   draft: string;
   setDraft: (s: string) => void;
   onSubmit: () => void;
   onDeepen: () => void;
   onEvolve: () => void;
-  onSelectTrack: (i: number) => void;
 }) {
-  const steps = trajectory?.steps ?? [];
   const floating = variant === "floating";
 
   const agentBubble = floating
-    ? "bg-white/[0.06] border border-white/10 text-fg/90 backdrop-blur-sm"
+    ? "bg-white/[0.04] border border-white/10 text-fg/90"
     : "bg-bg-elev/70 text-fg/90";
   const userBubble = floating
-    ? "ml-auto border border-accent/30 bg-accent/15 text-fg"
+    ? "ml-auto border border-accent/25 bg-accent/10 text-fg"
     : "ml-auto bg-bg-elev-2 text-fg";
 
   return (
@@ -64,49 +54,6 @@ export default function ConversationPanel({
             {m.text}
           </div>
         ))}
-
-        {trajectory && (
-          <div className="space-y-2 pt-1">
-            {steps.map((s, i) => {
-              const t = s.selected_track;
-              const active = i === index;
-              const dom = Object.entries(s.target_distribution.weights).sort(
-                (a, b) => (b[1] ?? 0) - (a[1] ?? 0),
-              )[0]?.[0] as MacroNode | undefined;
-              const cardBg = floating
-                ? active
-                  ? "border-accent/40 bg-white/[0.08] backdrop-blur-sm"
-                  : "border-white/10 bg-white/[0.04] backdrop-blur-sm"
-                : active
-                  ? "border-accent/40 bg-bg-elev"
-                  : "border-border hover:bg-bg-elev/60";
-              return (
-                <button
-                  key={t.track_id}
-                  onClick={() => onSelectTrack(i)}
-                  className={`flex w-full gap-3 rounded-xl border p-2.5 text-left transition ${cardBg}`}
-                >
-                  <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-bg-elev-2">
-                    {t.artwork_url ? (
-                      <Image src={t.artwork_url} alt="" fill sizes="48px" className="object-cover" unoptimized />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-muted">♪</div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dom ? TAXONOMY[dom].color : "var(--muted)" }} />
-                      <span className="truncate text-sm font-medium">{t.title}</span>
-                      {active && isPlaying && <span className="text-xs text-accent">♪</span>}
-                    </div>
-                    <div className="truncate text-xs text-muted">{t.artist}</div>
-                    <div className="mt-1 text-xs italic text-fg/70">“{s.citable_verse}”</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       <div className={`px-4 pt-3 ${floating ? "" : "border-t border-border"}`}>
@@ -118,21 +65,40 @@ export default function ConversationPanel({
           <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.round(comprehension * 100)}%` }} />
         </div>
 
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={onDeepen}
-            disabled={!seed}
-            className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg disabled:opacity-30"
-          >
-            go deeper
-          </button>
-          <button
-            onClick={onEvolve}
-            className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
-          >
-            take me somewhere new
-          </button>
-        </div>
+        {!trajectory ? (
+          // before the journey: one clear way to proceed. (At 100% it auto-starts.)
+          <div className="mt-3 flex flex-col gap-2">
+            <button
+              onClick={onDeepen}
+              disabled={!seed}
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-medium text-bg transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-bg-elev-2 disabled:text-muted-2"
+            >
+              <span aria-hidden>▶</span> play my journey
+            </button>
+            <button
+              onClick={onEvolve}
+              className="text-center text-xs text-muted transition hover:text-fg"
+            >
+              i can&apos;t describe my mood
+            </button>
+          </div>
+        ) : (
+          // mid-journey: reshape it
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={onDeepen}
+              className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
+            >
+              go deeper
+            </button>
+            <button
+              onClick={onEvolve}
+              className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
+            >
+              take me somewhere new
+            </button>
+          </div>
+        )}
 
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="my-3 flex gap-2">
           <input
