@@ -38,6 +38,7 @@ export default function SplitView() {
   const [distribution, setDistribution] = useState<NodeDistribution | undefined>(undefined);
   const [draft, setDraft] = useState("");
 
+  const [pending, setPending] = useState(false);
   const [trajectory, setTrajectory] = useState<Trajectory | null>(null);
   const [index, setIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -73,6 +74,7 @@ export default function SplitView() {
   // decided to emit one.
   const sendTurn = useCallback(async (req: Omit<AgentTurnRequest, "session_id">, userText?: string) => {
     if (userText) setMessages((m) => [...m, { role: "user", text: userText }]);
+    setPending(true);
     let turn: AgentTurn;
     try {
       const res = await fetch("/api/agent", {
@@ -80,10 +82,14 @@ export default function SplitView() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...req, session_id: sessionId.current }),
       });
+      if (!res.ok) throw new Error(`agent ${res.status}`);
       turn = await res.json();
     } catch {
+      setPending(false);
+      setMessages((m) => [...m, { role: "agent", text: "i lost you for a second — say that again?" }]);
       return;
     }
+    setPending(false);
     setMessages((m) => [...m, { role: "agent", text: turn.message }]);
     setComprehension(turn.confidence);
     setDistribution(turn.distribution);
@@ -108,7 +114,7 @@ export default function SplitView() {
     if (a) { a.pause(); a.removeAttribute("src"); }
     sessionId.current = crypto.randomUUID();
     setMessages([{ role: "agent", text: "describe your mood — in your own words." }]);
-    setComprehension(0); setDistribution(undefined);
+    setComprehension(0); setDistribution(undefined); setPending(false);
     setTrajectory(null); setIndex(0); setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
 
@@ -121,7 +127,7 @@ export default function SplitView() {
   const seek = (t: number) => { const a = audioRef.current; if (a) a.currentTime = t; };
 
   const convoProps = {
-    messages, comprehension, canStart, trajectory,
+    messages, comprehension, canStart, trajectory, pending,
     draft, setDraft, onSubmit: submit, onDeepen: () => startJourney("deepen"),
     onEvolve: () => startJourney("evolve"),
   };

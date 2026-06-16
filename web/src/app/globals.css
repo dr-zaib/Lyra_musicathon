@@ -98,29 +98,41 @@ body::before {
   animation: lyra-breathe 7s ease-in-out infinite;
 }
 
-/* interactive emotion nodes on the landing wheel */
-.emotion-node {
-  cursor: pointer;
+/* agent "thinking" dots */
+@keyframes lyra-typing {
+  0%, 60%, 100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
 }
-.emotion-node .dot {
-  transition: r 0.18s ease, opacity 0.18s ease;
+.lyra-typing-dot {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--muted);
+  animation: lyra-typing 1.1s ease-in-out infinite;
 }
-.emotion-node .halo {
-  opacity: 0;
-  transition: opacity 0.2s ease, r 0.2s ease;
+.lyra-typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
 }
-.emotion-node text {
-  transition: fill 0.18s ease, opacity 0.18s ease, font-size 0.18s ease;
+.lyra-typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
 }
-.emotion-node:hover .dot {
-  r: 4.4;
-  opacity: 1;
-}
-.emotion-node:hover .halo {
-  opacity: 0.28;
-}
-.emotion-node:hover text {
-  fill: var(--fg);
-  opacity: 1;
-  font-size: 3.1px;
+
+/* accessibility: honor reduced motion — stop the breathing wheel + snap transitions
+   (the wheel's rAF tween also snaps via matchMedia in EmotionWheel) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -15,6 +15,7 @@ export default function ConversationPanel({
   comprehension,
   canStart,
   trajectory,
+  pending,
   draft,
   setDraft,
   onSubmit,
@@ -26,6 +27,7 @@ export default function ConversationPanel({
   comprehension: number;
   canStart: boolean;
   trajectory: Trajectory | null;
+  pending: boolean;
   draft: string;
   setDraft: (s: string) => void;
   onSubmit: () => void;
@@ -54,6 +56,14 @@ export default function ConversationPanel({
             {m.text}
           </div>
         ))}
+
+        {pending && (
+          <div className={`flex max-w-[60%] gap-1 rounded-xl px-3 py-3 ${agentBubble}`} aria-label="lyra is thinking">
+            <span className="lyra-typing-dot" />
+            <span className="lyra-typing-dot" />
+            <span className="lyra-typing-dot" />
+          </div>
+        )}
       </div>
 
       <div className={`px-4 pt-3 ${floating ? "" : "border-t border-border"}`}>
