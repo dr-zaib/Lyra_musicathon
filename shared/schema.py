@@ -40,7 +40,9 @@ TrajectoryShape = Literal["deepen", "evolve", "escalate"]
 
 
 class NodeDistribution(BaseModel):
-    """Weight distribution over the macro-nodes (normalized, sums to 1)."""
+    """Weight distribution over the macro-nodes. As an *intent* distribution it
+    carries at most 3 non-zero nodes and its weights sum to (1 - shuffle); as a
+    step/track distribution it sums to 1."""
 
     weights: dict[str, float] = Field(default_factory=dict)
 
@@ -74,3 +76,29 @@ class Trajectory(BaseModel):
     shape: TrajectoryShape
     start_distribution: NodeDistribution
     steps: list[TrajectoryStep]
+
+
+# --- conversational seam: one endpoint, "message in → agent turn out" ---------
+class AgentTurnRequest(BaseModel):
+    """One conversational turn from the user → the agent (the single endpoint).
+    `message` is the free-text input; `seed_mood`/`shape` are the optional
+    click-a-node shortcut (bypass text interpretation). At least one of
+    `message` or `seed_mood` should be set."""
+
+    message: str | None = None
+    session_id: str | None = None
+    seed_mood: MacroNode | None = None
+    shape: TrajectoryShape | None = None
+
+
+class AgentTurn(BaseModel):
+    """The agent's response for one turn. `confidence` and `distribution` update
+    on EVERY turn — including pure-conversation turns where `trajectory` is None
+    (the wheel + comprehension bar react before any journey is built)."""
+
+    message: str                       # the agent's voice
+    confidence: float = 0.0            # 0..1 — wheel sharpness/fog, NOT which emotions
+    # intent: the user's mood read (≤3 non-zero nodes)
+    distribution: NodeDistribution = Field(default_factory=NodeDistribution)
+    shuffle: float = 0.0               # neutral remainder; sum(distribution.weights) + shuffle == 1
+    trajectory: Trajectory | None = None

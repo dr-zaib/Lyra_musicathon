@@ -21,7 +21,8 @@ export type MacroNode =
 export type TrajectoryShape = "deepen" | "evolve" | "escalate";
 
 export interface NodeDistribution {
-  // macro-node name -> weight, normalized to sum 1
+  // macro-node name -> weight. As an *intent* distribution: ≤3 non-zero nodes,
+  // weights sum to (1 - shuffle). As a step/track distribution: sums to 1.
   weights: Partial<Record<MacroNode, number>>;
 }
 
@@ -55,7 +56,29 @@ export interface Trajectory {
   steps: TrajectoryStep[];
 }
 
+// Click-a-node shortcut payload (also expressible via AgentTurnRequest below).
 export interface TrajectoryRequest {
   seed_mood: MacroNode;
   shape: TrajectoryShape;
+}
+
+// --- conversational seam: one endpoint, "message in → agent turn out" ---------
+// One conversational turn from the user → the agent (the single endpoint).
+// `message` = free text; `seed_mood`/`shape` = optional click-a-node shortcut.
+export interface AgentTurnRequest {
+  message?: string | null;
+  session_id?: string | null;
+  seed_mood?: MacroNode | null;
+  shape?: TrajectoryShape | null;
+}
+
+// The agent's response for one turn. `confidence` + `distribution` update on every
+// turn, even when `trajectory` is null (pure conversation). `distribution` = intent
+// (≤3 nodes); sum(distribution.weights) + shuffle === 1. `confidence` = wheel sharpness.
+export interface AgentTurn {
+  message: string;
+  confidence: number;
+  distribution: NodeDistribution;
+  shuffle: number;
+  trajectory?: Trajectory | null;
 }
