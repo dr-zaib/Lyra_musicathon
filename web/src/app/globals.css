@@ -107,5 +107,19 @@ body::before {
 .wheel-comet {
   transform-box: fill-box;
   transform-origin: center;
-  animation: wheel-spin 14s linear infinite;
+  animation: wheel-spin 16s linear infinite;
+}
+
+/* interactive emotion nodes on the landing wheel */
+.emotion-node {
+  cursor: pointer;
+}
+.emotion-node .dot {
+  transition: r 0.15s ease;
+}
+.emotion-node:hover .dot {
+  r: 3.2;
+}
+.emotion-node:hover text {
+  fill: var(--fg);
 }
