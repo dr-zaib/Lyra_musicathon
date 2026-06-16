@@ -1,18 +1,48 @@
 "use client";
 
-// L'atlante emotivo: i 12 macro-nodi disposti su un piano valenza x intensità,
-// con la traiettoria tracciata come percorso e la posizione corrente che pulsa.
-// I nodi che compongono lo step corrente si accendono (anello) -> collega la
-// mappa alle percentuali mood nella StepCard. Waypoint cliccabili per saltare.
-// È il visual-hero del demo; sostituibile con react-flow se serve drag/zoom.
+// La ruota emotiva: le 12 emozioni disposte in cerchio (circumplex di Russell —
+// valenza/arousal), il viaggio tracciato come un filo di luce che attraversa la
+// ruota, la posizione corrente che pulsa. Sobrio: geometria pulita, glow viola,
+// nessun orpello. È il visual-hero del demo.
 
+import { motion } from "motion/react";
 import { useMemo } from "react";
 
-import { ALL_NODES, centroid } from "@/lib/taxonomy";
+import { TAXONOMY } from "@/lib/taxonomy";
 import type { MacroNode, Trajectory } from "@/lib/types";
 
-const px = (x: number) => x * 100;
-const py = (y: number) => (1 - y) * 100; // intensità alta = in alto
+const CX = 50;
+const CY = 50;
+const R = 34; // raggio della ruota
+
+// ordine attorno al cerchio (circumplex): caldo/positivo a destra, alta energia
+// in alto, negativo a sinistra, introspettivo in basso.
+const WHEEL_ORDER: MacroNode[] = [
+  "Tenderness", "Hope", "Joy", "Empowerment",
+  "Awe", "Defiance", "Anger", "Anxiety",
+  "Melancholia", "Solitude", "Reflection", "Nostalgia",
+];
+
+const ANGLE: Record<string, number> = Object.fromEntries(
+  WHEEL_ORDER.map((name, i) => [name, (i * 360) / WHEEL_ORDER.length]),
+);
+
+function rimPos(name: MacroNode, radius = R) {
+  const rad = (ANGLE[name] * Math.PI) / 180;
+  return { x: CX + radius * Math.cos(rad), y: CY - radius * Math.sin(rad) };
+}
+
+// punto della traiettoria = combinazione convessa delle posizioni sulla ruota
+// (concentrato su un'emozione → vicino al suo nodo; misto → verso il centro).
+function stepPos(weights: Partial<Record<MacroNode, number>>) {
+  let x = 0, y = 0, tot = 0;
+  for (const [n, w] of Object.entries(weights) as [MacroNode, number][]) {
+    const p = rimPos(n);
+    x += p.x * w; y += p.y * w; tot += w;
+  }
+  if (!tot) return { x: CX, y: CY };
+  return { x: x / tot, y: y / tot };
+}
 
 export default function EmotionalAtlas({
   trajectory,
@@ -23,119 +53,92 @@ export default function EmotionalAtlas({
   currentIndex: number;
   onSelectStep?: (i: number) => void;
 }) {
-  const points = useMemo(() => {
-    if (!trajectory) return [];
-    return trajectory.steps.map((s) => {
-      const c = centroid(s.target_distribution.weights);
-      return { x: px(c.x), y: py(c.y) };
-    });
-  }, [trajectory]);
-
-  const pathD = useMemo(() => {
-    if (points.length < 2) return "";
-    return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-  }, [points]);
-
+  const points = useMemo(
+    () => (trajectory?.steps ?? []).map((s) => stepPos(s.target_distribution.weights)),
+    [trajectory],
+  );
+  const pathD = points.length > 1
+    ? points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ")
+    : "";
   const current = points[currentIndex];
 
-  // nodi che compongono lo step corrente (per accenderli)
   const activeNodes = new Set<MacroNode>(
     Object.keys(trajectory?.steps[currentIndex]?.target_distribution.weights ?? {}) as MacroNode[],
   );
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-bg-elev/60">
-      <div className="pointer-events-none absolute left-4 top-4 z-10">
-        <div className="text-xs uppercase tracking-[0.2em] text-muted-2">
-          Emotional atlas
-        </div>
-        <div className="mt-1 flex gap-4 text-[10px] text-muted-2">
-          <span>← darker · brighter →</span>
-          <span>↑ more intense</span>
+    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-bg-elev/50">
+      <div className="pointer-events-none absolute left-5 top-4 z-10">
+        <div className="font-display text-sm tracking-[0.25em] text-muted">
+          THE EMOTIONAL WHEEL
         </div>
       </div>
 
-      <svg
-        viewBox="0 0 100 100"
-        preserveAspectRatio="xMidYMid meet"
-        className="h-full w-full"
-      >
+      <svg viewBox="-14 -10 128 120" className="h-full w-full">
         <defs>
-          <radialGradient id="here" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.9" />
+          <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.85" />
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
           </radialGradient>
-          <linearGradient id="trail" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#6d83b8" />
+          <linearGradient id="thread" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#8a93d8" />
             <stop offset="100%" stopColor="var(--accent)" />
           </linearGradient>
         </defs>
 
-        {/* nodi di sfondo */}
-        {ALL_NODES.map((n) => {
-          const cx = px(n.x);
-          const cy = py(n.y);
-          const active = activeNodes.has(n.name);
+        {/* cerchi guida (arousal) */}
+        {[R, R * 0.62, R * 0.28].map((r) => (
+          <circle key={r} cx={CX} cy={CY} r={r} fill="none"
+            stroke="var(--border)" strokeWidth={0.4} />
+        ))}
+
+        {/* nodi emozione sulla ruota */}
+        {WHEEL_ORDER.map((name) => {
+          const p = rimPos(name);
+          const lp = rimPos(name, R + 7);
+          const active = activeNodes.has(name);
+          const color = TAXONOMY[name].color;
+          const anchor = lp.x > CX + 1 ? "start" : lp.x < CX - 1 ? "end" : "middle";
           return (
-            <g key={n.name}>
-              <title>{n.name}</title>
+            <g key={name}>
+              <title>{name}</title>
               {active && (
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={4}
-                  fill="none"
-                  stroke={n.color}
-                  strokeWidth={0.5}
-                  opacity={0.7}
-                />
+                <circle cx={p.x} cy={p.y} r={3.4} fill="none" stroke={color}
+                  strokeWidth={0.6} opacity={0.7} />
               )}
-              <circle
-                cx={cx}
-                cy={cy}
-                r={active ? 2.8 : 2.4}
-                fill={n.color}
-                opacity={active ? 1 : 0.45}
-              />
-              <text
-                x={cx}
-                y={cy - 3.6}
-                textAnchor="middle"
-                fontSize={2.6}
+              <circle cx={p.x} cy={p.y} r={active ? 2.6 : 2}
+                fill={color} opacity={active ? 1 : 0.5} />
+              <text x={lp.x} y={lp.y + 1} textAnchor={anchor} fontSize={2.7}
                 fill={active ? "var(--fg)" : "var(--muted)"}
-                style={{ pointerEvents: "none" }}
-              >
-                {n.name}
+                style={{ pointerEvents: "none" }}>
+                {name}
               </text>
             </g>
           );
         })}
 
-        {/* traiettoria */}
+        {/* filo del viaggio */}
         {pathD && (
-          <path
+          <motion.path
+            key={trajectory?.shape}
             d={pathD}
             fill="none"
-            stroke="url(#trail)"
-            strokeWidth={0.9}
+            stroke="url(#thread)"
+            strokeWidth={1}
             strokeLinecap="round"
-            strokeDasharray="0.1 2"
-            opacity={0.9}
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 0.95 }}
+            transition={{ duration: 1.1, ease: "easeInOut" }}
           />
         )}
 
-        {/* waypoint percorsi (cliccabili) */}
+        {/* waypoint */}
         {points.map((p, i) => (
-          <circle
-            key={i}
-            cx={p.x}
-            cy={p.y}
-            r={i <= currentIndex ? 1.6 : 1.1}
+          <circle key={i} cx={p.x} cy={p.y} r={i <= currentIndex ? 1.5 : 1}
             fill={i <= currentIndex ? "var(--accent)" : "var(--muted-2)"}
             opacity={i <= currentIndex ? 1 : 0.6}
             style={{ cursor: onSelectStep ? "pointer" : "default" }}
-            onClick={() => onSelectStep?.(i)}
-          >
+            onClick={() => onSelectStep?.(i)}>
             <title>Step {i + 1}</title>
           </circle>
         ))}
@@ -143,16 +146,19 @@ export default function EmotionalAtlas({
         {/* posizione corrente */}
         {current && (
           <>
-            <circle cx={current.x} cy={current.y} r={6} fill="url(#here)" />
-            <circle
-              cx={current.x}
-              cy={current.y}
-              r={2.1}
-              fill="var(--accent)"
-              style={{
-                transformOrigin: `${current.x}px ${current.y}px`,
-                animation: "pulse-dot 1.8s ease-in-out infinite",
+            <motion.circle
+              animate={{ cx: current.x, cy: current.y }}
+              transition={{ type: "spring", stiffness: 120, damping: 18 }}
+              r={6} fill="url(#glow)"
+            />
+            <motion.circle
+              animate={{ cx: current.x, cy: current.y, opacity: [0.6, 1, 0.6] }}
+              transition={{
+                cx: { type: "spring", stiffness: 120, damping: 18 },
+                cy: { type: "spring", stiffness: 120, damping: 18 },
+                opacity: { duration: 1.8, repeat: Infinity, ease: "easeInOut" },
               }}
+              r={2} fill="var(--accent)"
             />
           </>
         )}

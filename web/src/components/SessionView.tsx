@@ -137,7 +137,7 @@ export default function SessionView() {
 
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
         <div className="flex items-baseline gap-3">
-          <span className="text-xl font-semibold tracking-tight">Lyra</span>
+          <span className="font-display text-2xl font-medium tracking-tight">Lyra</span>
           <span className="text-xs uppercase tracking-[0.2em] text-muted-2">
             {trajectory?.shape === "evolve" ? "Evolving" : "Going deeper"}
           </span>

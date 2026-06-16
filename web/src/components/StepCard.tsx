@@ -68,7 +68,7 @@ export default function StepCard({
           )}
         </div>
         <div className="min-w-0">
-          <div className="truncate text-lg font-semibold">{t.title}</div>
+          <div className="truncate font-display text-2xl font-medium">{t.title}</div>
           <div className="truncate text-muted">{t.artist}</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {dominant.slice(0, 3).map(([node, w]) => (

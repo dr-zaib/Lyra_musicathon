@@ -22,8 +22,8 @@ export default function MoodPicker({
   return (
     <div className="relative z-10 mx-auto flex min-h-[80vh] max-w-2xl flex-col items-center justify-center px-6 text-center">
       <div className="animate-fade-up">
-        <h1 className="text-5xl font-semibold tracking-tight">Lyra</h1>
-        <p className="mt-3 text-balance text-muted">
+        <h1 className="font-display text-7xl font-medium tracking-tight">Lyra</h1>
+        <p className="mx-auto mt-3 max-w-md text-balance text-muted">
           Discover music by what it actually says. Tell me how you feel — I'll
           walk you through the emotions, and show you the line that marks each
           passage.

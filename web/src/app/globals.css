@@ -23,6 +23,7 @@
   --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
 }
 
 html,
@@ -37,18 +38,21 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* atmosfera: leggera nebbia radiale in alto */
+/* atmosfera: doppia aurora viola soffusa, sobria */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(
-    1200px 600px at 50% -10%,
-    #2a2350aa,
-    transparent 70%
-  );
   z-index: 0;
+  background:
+    radial-gradient(900px 520px at 50% -8%, #2c2456aa, transparent 70%),
+    radial-gradient(700px 500px at 85% 110%, #1f2a4d66, transparent 70%);
+}
+
+/* font display per wordmark e titoli */
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
 }
 
 @keyframes pulse-dot {
