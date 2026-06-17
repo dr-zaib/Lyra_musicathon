@@ -70,11 +70,12 @@ class _Intent(BaseModel):
     confidence: float          # 0..1 — how clearly you understood
     shape: TrajectoryShape     # deepen | evolve | escalate
     end_mood: MacroNode        # destination feeling (evolve/escalate); = seed for deepen
-    reply: str                 # one warm sentence back to the user
 
 
 def interpret(message: str) -> dict:
-    """The listener's words → an intent dict ready for an AgentTurn."""
+    """The listener's words → an intent dict ready for an AgentTurn. Lyra is a
+    recsys, not a chatbot: interpret READS the feeling (no conversational reply —
+    the agent's only language output is the per-step narration in narrate())."""
     try:
         prompt = (
             f'The listener said: "{message}"\n\n'
@@ -84,10 +85,9 @@ def interpret(message: str) -> dict:
             "deepen (stay, go deeper), evolve (move to a different feeling), escalate (raise intensity). "
             "Set `end_mood`: the destination the journey should arrive at — for evolve/escalate choose "
             "where to take them (e.g. from grief toward acceptance or hope, not somewhere jarring); "
-            "for deepen set it to their dominant mood. "
-            "Write one warm `reply` (a single sentence)."
+            "for deepen set it to their dominant mood."
         )
-        resp = _get_client().structured_response(input=prompt, output_cls=_Intent, max_tokens=600)
+        resp = _get_client().structured_response(input=prompt, output_cls=_Intent, max_tokens=500)
         intent: _Intent = _first(resp.structured_data)
         shuffle = max(0.0, min(1.0, intent.shuffle))
         weights = {m.node: max(0.0, m.weight) for m in intent.moods[:3]}
@@ -102,14 +102,14 @@ def interpret(message: str) -> dict:
             "seed_mood": seed,
             "shape": intent.shape,
             "end_mood": intent.end_mood,
-            "message": intent.reply,
+            "message": "",  # no conversational commentary — Lyra is a recsys, not a chatbot
         }
     except Exception as exc:  # never break the turn
         log.warning("interpret() fell back: %s", exc)
         return {
             "distribution": {"Melancholia": 1.0}, "shuffle": 0.0, "confidence": 0.0,
             "seed_mood": "Melancholia", "shape": "deepen", "end_mood": "Melancholia",
-            "message": "Tell me a little more about how you're feeling.",
+            "message": "",
         }
 
 
