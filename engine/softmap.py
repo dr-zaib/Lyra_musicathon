@@ -101,6 +101,21 @@ def label_to_distribution(label: str) -> dict[str, float]:
     return dist
 
 
+def prewarm(labels) -> None:
+    """Batch-embed all not-yet-cached labels in ONE mpnet call and fill the cache.
+    Big latency win when soft-mapping ~hundreds of candidate labels (vs one-by-one).
+    Uses the embedding result only (skips the per-label Claude fallback — intent
+    reading is where the LLM matters, not bulk candidate mapping)."""
+    todo = [l for l in dict.fromkeys(labels) if l and l not in _dist_cache]
+    if not todo:
+        return
+    nodes = node_embeddings()
+    vecs = embed(todo)
+    for label, v in zip(todo, vecs):
+        weights = _softmax(nodes @ v, SOFTMAX_TEMP)
+        _dist_cache[label] = {NODE_NAMES[i]: float(weights[i]) for i in range(len(NODE_NAMES))}
+
+
 def text_to_intent(text: str, top_k: int = 3) -> tuple[dict[str, float], float]:
     """STUB intent reader (placeholder for the LLM agent): free text → (distribution
     over the top-k nodes summing to 1, confidence=max cosine). Embeds the whole

@@ -19,3 +19,9 @@ import softmap as _softmap  # noqa: E402
 build_trajectory = _trajectory.build_trajectory
 # stub intent reader (placeholder for the LLM agent): text -> (distribution, confidence)
 text_to_intent = _softmap.text_to_intent
+
+
+def warm() -> None:
+    """Load the embedding model once (it lazy-loads on first use) so the first
+    real request doesn't pay the model-load cost. Called at backend startup."""
+    _softmap.prewarm(["warmup"])

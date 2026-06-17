@@ -33,7 +33,7 @@ from schema import (  # noqa: E402
 )
 
 # SWAP DONE: real engine (engine/) via the bridge, instead of mock_engine
-from engine_bridge import build_trajectory  # noqa: E402
+from engine_bridge import build_trajectory, warm  # noqa: E402
 import agent  # noqa: E402  (real datapizza+Claude agent: interpret + narrate)
 
 app = FastAPI(title="Lyra backend")
@@ -59,6 +59,16 @@ def _engine_trajectory(seed_mood: str, shape: str, end_mood: str | None = None) 
     """Real engine → validated Trajectory, then the agent voices transition_reason."""
     traj = Trajectory(**build_trajectory(seed_mood, shape, n_steps=N_STEPS, end_node=end_mood))
     return agent.narrate(traj)
+
+
+@app.on_event("startup")
+def _startup():
+    """Pre-load the embedding model so the first real request is fast."""
+    try:
+        warm()
+    except Exception as exc:  # never block startup on warmup
+        import logging
+        logging.getLogger("lyra.backend").warning("warmup skipped: %s", exc)
 
 
 @app.get("/health")
