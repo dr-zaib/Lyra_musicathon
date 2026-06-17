@@ -371,9 +371,11 @@ export default function SplitView() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-bg via-bg/85 to-transparent" />
 
         <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-          <div className="flex items-baseline gap-2 px-4 pt-4">
-            <span className="font-display text-xl font-medium lowercase tracking-tight">lyra</span>
-            <span className="text-[11px] text-muted-2">the lyrics layer for your player</span>
+          <div className="px-4 pt-4">
+            <div className="font-display text-2xl font-medium lowercase leading-none tracking-tight">
+              lyra<span className="text-accent">.</span>
+            </div>
+            <div className="mt-1 text-[11px] text-muted">the lyrics layer for your player</div>
           </div>
           <div className="min-h-0 flex-1">
             <ConversationPanel variant="floating" {...convoProps} />
@@ -395,8 +397,8 @@ export default function SplitView() {
         <main className="mx-auto flex w-full max-w-6xl flex-1 gap-6 overflow-hidden px-6 py-5">
           <section className="flex w-1/2 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="mb-2 flex items-baseline gap-3">
-              <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra</span>
-              <span className="text-xs text-muted-2">the lyrics layer for your player</span>
+              <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
+              <span className="text-xs text-muted">the lyrics layer for your player</span>
               <div className="ml-auto">{controls(playing || comprehension > 0)}</div>
             </div>
             <div className="flex-1">
