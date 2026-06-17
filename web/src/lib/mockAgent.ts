@@ -68,14 +68,15 @@ function accumulate(w0: Weights, m: MacroNode): Weights {
 type State = { weights: Weights; confidence: number; turn: number };
 const SESSIONS = new Map<string, State>();
 
-// Shape the running state into a contract turn. Intent distribution is normalized so
-// sum(weights) + shuffle === 1; `shuffle` is the neutral/serendipity remainder.
+// Shape the running state into a contract turn. `shuffle` is an INDEPENDENT field
+// (the neutral/serendipity remainder), NOT derived from confidence — the real agent
+// sets it on its own. Here it's the leftover intent mass: more/stronger moods → less
+// serendipity. Invariant kept: sum(distribution.weights) + shuffle === 1.
 function toTurn(s: State, message: string, trajectory: Trajectory | null = null): AgentTurn {
-  // confidence is the committed fraction of intent; the rest is serendipity (shuffle).
-  // No interaction (confidence 0) → shuffle 1 (pure surprise). They always sum to 1.
-  const shuffle = Math.round((1 - s.confidence) * 100) / 100;
-  const total = Object.values(s.weights).reduce((a, b) => a + (b ?? 0), 0) || 1;
-  const scale = (1 - shuffle) / total;
+  const mass = Object.values(s.weights).reduce((a, b) => a + (b ?? 0), 0); // total intent mass
+  const claimed = mass === 0 ? 0 : Math.min(0.9, mass / (mass + 0.5));
+  const shuffle = Math.round((1 - claimed) * 100) / 100;
+  const scale = mass === 0 ? 0 : claimed / mass;
   const weights: Weights = {};
   for (const [k, v] of Object.entries(s.weights) as [MacroNode, number][]) {
     weights[k] = Math.round((v ?? 0) * scale * 100) / 100;

@@ -52,6 +52,7 @@ export default function ConversationPanel({
   onSubmit,
   onDeepen,
   onEvolve,
+  onEscalate,
 }: {
   variant: "panel" | "floating";
   messages: Msg[];
@@ -64,6 +65,7 @@ export default function ConversationPanel({
   onSubmit: () => void;
   onDeepen: () => void;
   onEvolve: () => void;
+  onEscalate: () => void;
 }) {
   const floating = variant === "floating";
 
@@ -77,16 +79,18 @@ export default function ConversationPanel({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-              m.role === "agent" ? agentBubble : userBubble
-            }`}
-          >
-            {m.text}
-          </div>
-        ))}
+        {messages.map((m, i) =>
+          m.text.trim() ? (
+            <div
+              key={i}
+              className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                m.role === "agent" ? agentBubble : userBubble
+              }`}
+            >
+              {m.text}
+            </div>
+          ) : null,
+        )}
 
         {pending && <ThinkingIndicator floating={floating} />}
       </div>
@@ -125,8 +129,8 @@ export default function ConversationPanel({
             </button>
           </div>
         ) : (
-          // mid-journey: reshape it
-          <div className="mt-3 flex gap-2">
+          // mid-journey: reshape it — the three trajectory shapes
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
               onClick={onDeepen}
               className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
@@ -138,6 +142,12 @@ export default function ConversationPanel({
               className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
             >
               take me somewhere new
+            </button>
+            <button
+              onClick={onEscalate}
+              className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
+            >
+              turn it up
             </button>
           </div>
         )}

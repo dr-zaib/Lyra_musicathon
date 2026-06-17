@@ -129,7 +129,7 @@ export default function SplitView() {
   const convoProps = {
     messages, comprehension, canStart, trajectory, pending,
     draft, setDraft, onSubmit: submit, onDeepen: () => startJourney("deepen"),
-    onEvolve: () => startJourney("evolve"),
+    onEvolve: () => startJourney("evolve"), onEscalate: () => startJourney("escalate"),
   };
   const player = trajectory ? (
     <PlayerBar
