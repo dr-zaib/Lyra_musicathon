@@ -17,6 +17,8 @@ import softmap as _softmap  # noqa: E402
 
 # engine: deterministic structured data
 build_trajectory = _trajectory.build_trajectory
+entry_candidates = _trajectory.entry_candidates   # mood → skippable entry list (known/new)
+refill_candidates = _trajectory.refill_candidates  # centroid-seeded queue refill
 # stub intent reader (placeholder for the LLM agent): text -> (distribution, confidence)
 text_to_intent = _softmap.text_to_intent
 
