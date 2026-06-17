@@ -26,7 +26,8 @@ export async function POST(req: Request) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(8000),
+        // a real turn (engine + agent) takes ~14s — give it room before falling back
+        signal: AbortSignal.timeout(28000),
       });
       if (res.ok) return NextResponse.json(await res.json());
     } catch {

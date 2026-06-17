@@ -27,7 +27,8 @@ export async function POST(req: Request) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ seed_mood, shape }),
-        signal: AbortSignal.timeout(4000),
+        // real engine turn ~14s (kept in sync with /api/agent); unused by the app now
+        signal: AbortSignal.timeout(28000),
       });
       if (res.ok) return NextResponse.json(await res.json());
     } catch {

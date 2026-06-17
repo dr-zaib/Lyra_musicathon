@@ -5,34 +5,65 @@
 //  - variant "panel"    → desktop split (bordered card)
 //  - variant "floating" → mobile living-background (frosted, over the scrim)
 
-import type { Trajectory } from "@/lib/types";
+import { useEffect, useState } from "react";
 
 export type Msg = { role: "agent" | "user"; text: string };
+
+// While a turn is in flight (~14s on the real backend) Lyra "thinks" — dots + a
+// rotating status line so the wait never looks stuck.
+const THINKING = ["reading the feeling…", "walking the catalog…", "citing the line…"];
+function ThinkingIndicator({ floating }: { floating: boolean }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((n) => (n + 1) % THINKING.length), 2500);
+    return () => clearInterval(id);
+  }, []);
+  const bubble = floating
+    ? "border border-white/10 bg-white/[0.04]"
+    : "bg-bg-elev/70";
+  return (
+    <div
+      className={`flex max-w-[80%] items-center gap-2 rounded-xl px-3 py-2.5 ${bubble}`}
+      role="status"
+      aria-live="polite"
+      aria-label="lyra is thinking"
+    >
+      <span className="flex gap-1">
+        <span className="lyra-typing-dot" />
+        <span className="lyra-typing-dot" />
+        <span className="lyra-typing-dot" />
+      </span>
+      <span className="text-xs text-muted">{THINKING[i]}</span>
+    </div>
+  );
+}
 
 export default function ConversationPanel({
   variant,
   messages,
   comprehension,
-  canStart,
-  trajectory,
+  playing,
   pending,
   draft,
   setDraft,
   onSubmit,
+  onSurprise,
   onDeepen,
   onEvolve,
+  onEscalate,
 }: {
   variant: "panel" | "floating";
   messages: Msg[];
   comprehension: number;
-  canStart: boolean;
-  trajectory: Trajectory | null;
+  playing: boolean;
   pending: boolean;
   draft: string;
   setDraft: (s: string) => void;
   onSubmit: () => void;
+  onSurprise: () => void;
   onDeepen: () => void;
   onEvolve: () => void;
+  onEscalate: () => void;
 }) {
   const floating = variant === "floating";
 
@@ -46,24 +77,20 @@ export default function ConversationPanel({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-              m.role === "agent" ? agentBubble : userBubble
-            }`}
-          >
-            {m.text}
-          </div>
-        ))}
-
-        {pending && (
-          <div className={`flex max-w-[60%] gap-1 rounded-xl px-3 py-3 ${agentBubble}`} aria-label="lyra is thinking">
-            <span className="lyra-typing-dot" />
-            <span className="lyra-typing-dot" />
-            <span className="lyra-typing-dot" />
-          </div>
+        {messages.map((m, i) =>
+          m.text.trim() ? (
+            <div
+              key={i}
+              className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                m.role === "agent" ? agentBubble : userBubble
+              }`}
+            >
+              {m.text}
+            </div>
+          ) : null,
         )}
+
+        {pending && <ThinkingIndicator floating={floating} />}
       </div>
 
       <div className={`px-4 pt-3 ${floating ? "" : "border-t border-border"}`}>
@@ -82,26 +109,17 @@ export default function ConversationPanel({
           <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.round(comprehension * 100)}%` }} />
         </div>
 
-        {!trajectory ? (
-          // before the journey: one clear way to proceed. (At 100% it auto-starts.)
-          <div className="mt-3 flex flex-col gap-2">
-            <button
-              onClick={onDeepen}
-              disabled={!canStart}
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-medium text-bg transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-bg-elev-2 disabled:text-muted-2"
-            >
-              <span aria-hidden>▶</span> play my journey
-            </button>
-            <button
-              onClick={onEvolve}
-              className="text-center text-xs text-muted transition hover:text-fg"
-            >
-              i can&apos;t describe my mood
-            </button>
-          </div>
+        {!playing ? (
+          // before playback: the composer is the trigger; a quiet "surprise me" too
+          <button
+            onClick={onSurprise}
+            className="mt-3 text-center text-xs text-muted transition hover:text-fg"
+          >
+            i can&apos;t describe my mood — surprise me
+          </button>
         ) : (
-          // mid-journey: reshape it
-          <div className="mt-3 flex gap-2">
+          // playing: reshape the journey — the three trajectory shapes
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
               onClick={onDeepen}
               className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
@@ -113,6 +131,12 @@ export default function ConversationPanel({
               className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
             >
               take me somewhere new
+            </button>
+            <button
+              onClick={onEscalate}
+              className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
+            >
+              turn it up
             </button>
           </div>
         )}
