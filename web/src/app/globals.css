@@ -124,6 +124,35 @@ body::before {
   animation-delay: 0.3s;
 }
 
+/* range inputs: the native thumb picks up the OS accent colour (a stray red dot on
+   some Windows setups). Force our accent, then take explicit control of the thumb. */
+input[type="range"] { accent-color: var(--accent); }
+
+/* player seek: a clean line, no visible knob (click + drag still seek) */
+.lyra-seek::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 0; height: 0; }
+.lyra-seek::-moz-range-thumb { width: 0; height: 0; border: none; background: transparent; }
+
+/* settings sliders: a small gold knob */
+.lyra-knob::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -4px;
+  border-radius: 9999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--bg-elev);
+  cursor: pointer;
+}
+.lyra-knob::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--accent);
+  cursor: pointer;
+}
+
 /* now-playing equalizer on the player artwork */
 @keyframes lyra-eq {
   0%, 100% { transform: scaleY(0.28); }

@@ -71,7 +71,7 @@ export default function PlayerBar({
         value={currentTime}
         onChange={(e) => onSeek(Number(e.target.value))}
         aria-label="seek"
-        className="block h-1 w-full cursor-pointer appearance-none bg-transparent"
+        className="lyra-seek block h-1 w-full cursor-pointer appearance-none bg-transparent"
         style={{ background: `linear-gradient(to right, var(--accent) ${pct}%, var(--bg-elev-2) ${pct}%)` }}
       />
 

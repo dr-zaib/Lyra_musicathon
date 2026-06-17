@@ -54,7 +54,7 @@ export default function Settings({
             type="range" min={0} max={100} value={pctNew}
             onChange={(e) => setSettings({ ...settings, knownNew: Number(e.target.value) / 100 })}
             aria-label="known to new ratio"
-            className="h-1.5 w-full cursor-pointer appearance-none rounded-full"
+            className="lyra-knob h-1.5 w-full cursor-pointer appearance-none rounded-full"
             style={{ background: `linear-gradient(to right, var(--accent) ${pctNew}%, var(--bg-elev-2) ${pctNew}%)` }}
           />
           <p className="mt-1 text-[11px] text-muted-2">how much Lyra leans into songs you don&apos;t know yet.</p>
