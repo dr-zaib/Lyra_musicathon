@@ -1,10 +1,28 @@
 "use client";
 
-// Playback settings: the known↔new discovery ratio and the skip mode.
+// Playback settings: the known↔new discovery ratio, the skip mode, the lyrics language.
 //  - knownNew: fraction of NEW (discovery) vs KNOWN (go-to). Floored ~0.15 by the engine.
 //  - skipMode: "scroll" (TikTok-style vertical swipe, default) | "arrows" (classic player).
+//  - language: ISO 639-1 code → Musixmatch lyrics_language. Default = the browser's language.
 
-export type PlaybackSettings = { knownNew: number; skipMode: "scroll" | "arrows" };
+export type PlaybackSettings = { knownNew: number; skipMode: "scroll" | "arrows"; language: string };
+
+// Lyrics languages we surface. ISO 639-1 → Musixmatch `lyrics_language`.
+export const LANGS: { code: string; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "it", label: "Italiano" },
+  { code: "es", label: "Español" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "pt", label: "Português" },
+];
+
+// The browser's language, clamped to a supported code (falls back to English).
+export function defaultLanguage(): string {
+  if (typeof navigator === "undefined") return "en";
+  const base = (navigator.language || "en").split("-")[0].toLowerCase();
+  return LANGS.some((l) => l.code === base) ? base : "en";
+}
 
 export default function Settings({
   settings,
@@ -63,6 +81,27 @@ export default function Settings({
           <p className="mt-1 text-[11px] text-muted-2">
             {settings.skipMode === "scroll" ? "swipe up for next, down for previous." : "use the player arrows."}
           </p>
+        </div>
+
+        {/* lyrics language */}
+        <div className="mt-5">
+          <div className="mb-2 text-xs text-muted">lyrics language</div>
+          <div className="flex flex-wrap gap-2">
+            {LANGS.map((l) => (
+              <button
+                key={l.code}
+                onClick={() => setSettings({ ...settings, language: l.code })}
+                className={`rounded-xl border px-3 py-1.5 text-xs transition ${
+                  settings.language === l.code
+                    ? "border-accent bg-accent/10 text-fg"
+                    : "border-border text-muted hover:text-fg"
+                }`}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-2">which language Lyra picks lyrics in — defaults to your browser&apos;s.</p>
         </div>
       </div>
     </div>

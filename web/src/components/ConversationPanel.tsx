@@ -44,9 +44,12 @@ export default function ConversationPanel({
   comprehension,
   playing,
   pending,
+  building,
+  hasSignal,
   draft,
   setDraft,
   onSubmit,
+  onCreate,
   onSurprise,
   onDeepen,
   onEvolve,
@@ -57,9 +60,12 @@ export default function ConversationPanel({
   comprehension: number;
   playing: boolean;
   pending: boolean;
+  building: boolean;
+  hasSignal: boolean;
   draft: string;
   setDraft: (s: string) => void;
   onSubmit: () => void;
+  onCreate: () => void;
   onSurprise: () => void;
   onDeepen: () => void;
   onEvolve: () => void;
@@ -110,34 +116,51 @@ export default function ConversationPanel({
         </div>
 
         {!playing ? (
-          // before playback: the composer is the trigger; a quiet "surprise me" too
-          <button
-            onClick={onSurprise}
-            className="mt-3 text-center text-xs text-muted transition hover:text-fg"
-          >
-            i can&apos;t describe my mood — surprise me
-          </button>
+          // before playback: describe the mood (type or click nodes), then commit.
+          // once there's signal, the explicit "create my playlist" is the trigger.
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            {hasSignal && (
+              <button
+                onClick={onCreate}
+                className="w-full rounded-xl bg-accent px-4 py-2 text-sm font-medium text-bg transition hover:brightness-110"
+              >
+                create my playlist ▶
+              </button>
+            )}
+            <button
+              onClick={onSurprise}
+              className="text-center text-xs text-muted transition hover:text-fg"
+            >
+              {hasSignal ? "or surprise me" : "i can’t describe my mood — surprise me"}
+            </button>
+          </div>
         ) : (
-          // playing: reshape the journey — the three trajectory shapes
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              onClick={onDeepen}
-              className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
-            >
-              go deeper
-            </button>
-            <button
-              onClick={onEvolve}
-              className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
-            >
-              take me somewhere new
-            </button>
-            <button
-              onClick={onEscalate}
-              className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
-            >
-              turn it up
-            </button>
+          // playing: steer where the playlist goes next — the three trajectory shapes
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted-2">
+              <span>your playlist — where to next?</span>
+              {building && <span className="text-muted">extending your playlist…</span>}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={onDeepen}
+                className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
+              >
+                more like this
+              </button>
+              <button
+                onClick={onEvolve}
+                className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
+              >
+                change the mood
+              </button>
+              <button
+                onClick={onEscalate}
+                className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
+              >
+                raise the energy
+              </button>
+            </div>
           </div>
         )}
 

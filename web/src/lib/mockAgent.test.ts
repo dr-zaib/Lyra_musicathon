@@ -64,4 +64,20 @@ describe("mockAgentTurn — the agent-turn contract", () => {
     const t = mockAgentTurn({ shape: "evolve", session_id: sid() });
     expect(t.trajectory?.shape).toBe("evolve");
   });
+
+  // describe-then-create: composing builds session state; committing (an empty entry
+  // turn) must keep the accumulated mood rather than reset it.
+  it("compose then commit: an empty turn keeps the accumulated mood", () => {
+    const s = sid();
+    mockAgentTurn({ message: "i feel joyful", session_id: s });
+    const committed = mockAgentTurn({ message: "", session_id: s });
+    expect(Object.keys(committed.distribution.weights)).toContain("Joy");
+    expect(committed.confidence).toBeGreaterThan(0);
+  });
+
+  it("clicking a node composes the mood (seed_mood lands in the distribution)", () => {
+    const t = mockAgentTurn({ seed_mood: "Anger", session_id: sid() });
+    expect(Object.keys(t.distribution.weights)).toContain("Anger");
+    expect(t.confidence).toBeGreaterThan(0);
+  });
 });

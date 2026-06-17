@@ -70,6 +70,7 @@ export interface AgentTurnRequest {
   session_id?: string | null;
   seed_mood?: MacroNode | null;
   shape?: TrajectoryShape | null;
+  language?: string | null; // ISO 639-1 lyrics language (Musixmatch lyrics_language)
 }
 
 // The agent's response for one turn. `confidence` + `distribution` update on every
@@ -94,6 +95,7 @@ export interface EntryRequest {
   seed_mood?: MacroNode | null; // click-a-node shortcut
   n?: number;                   // how many entry candidates (default 6)
   known_new?: number | null;    // % new (discovery); null → default
+  language?: string | null;     // ISO 639-1 lyrics language; null → engine default ("en")
 }
 
 export interface EntryResponse {
@@ -110,6 +112,7 @@ export interface JourneyRequest {
   exclude_isrcs?: string[]; // already played (entry track + skips)
   known_new?: number | null;
   session_id?: string | null;
+  language?: string | null; // ISO 639-1 lyrics language; null → engine default ("en")
 }
 
 export interface RefillRequest {
@@ -118,4 +121,5 @@ export interface RefillRequest {
   n?: number;
   known_new?: number | null;
   session_id?: string | null;
+  language?: string | null; // ISO 639-1 lyrics language; null → engine default ("en")
 }
