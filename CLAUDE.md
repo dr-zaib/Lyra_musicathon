@@ -114,6 +114,7 @@ Young framework (v0.x) → keep it in a **low-risk role**:
 - WS-D (Axel): ✅ DONE — engine built + wired into the backend with karaoke timestamps.
 - WS-E (shared): ✅ DONE — `analysis.search` validated, gate passed, Strada B adopted.
 - WS-V (Alberto, frontend): **ElevenLabs voice-out** — `/api/tts` proxy + speak the agent's lines with music ducking + mute toggle. Needs `ELEVENLABS_API_KEY` in `web/.env.local`.
+- ✅ **Ban-list + shuffle behaviour built (Axel, engine)**: `find_next_track` filters the user's banned artists/tracks at every tier (`engine/data/user_prefs.json`); `build_trajectory(shuffle=…)` draws a `shuffle` fraction of the journey from the user's go-to (the seed) ∪ new-but-similar discovery (taste-seeded `analysis.search`, open popularity), the rest aimed at targets. `/turn` passes the agent's `shuffle` through.
 - **NEXT** — point `web` at the real backend end-to-end (`BACKEND_URL` → `/turn`) with a loading state (~14s/turn) or a progressive response.
 - Deploy: backend on Replit, frontend on Vercel/Replit. Pitch + cover + video by the 21st.
 
