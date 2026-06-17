@@ -15,6 +15,7 @@ never persisted. Only identifiers flow into the (transient) response.
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -50,7 +51,7 @@ NODE_TO_MXM_MOOD = {
 # nodes that read as "higher intensity" — used by the (experimental) escalate shape
 HIGH_AROUSAL = ["Anger", "Empowerment", "Defiance", "Joy", "Anxiety"]
 
-CANDIDATES_PER_STEP = 100   # pull a wide pool, then filter by popularity + nearest
+CANDIDATES_PER_STEP = 60    # wide enough to filter by popularity + nearest, fast to embed
 MIN_TRACK_RATING = 20       # popularity floor — surface recognizable tracks (0–100)
 
 
@@ -178,6 +179,24 @@ def _citable_verse(analysis: dict, target: np.ndarray | None = None) -> str | No
     return None
 
 
+def _verse_timestamp(commontrack_id, verse: str | None) -> float | None:
+    """Find when the citable verse is sung, via richsync (for the karaoke jump).
+    Matches the verse text to a timed line; None if no match / no richsync."""
+    if not verse or not commontrack_id:
+        return None
+    v = verse.lower().strip()
+    try:
+        lines = mxm.richsync_lines(commontrack_id)
+    except Exception as exc:  # richsync is optional — never break the journey
+        log.warning("richsync lookup failed (%s) — no timestamp.", exc)
+        return None
+    for ln in lines:
+        x = (ln.get("text") or "").lower().strip()
+        if x and (x == v or v in x or x in v):
+            return ln.get("ts")
+    return None
+
+
 def find_next_track(target: np.ndarray, candidates: list[dict], used: set,
                     require_richsync: bool = False, min_rating: int = 0):
     """Pick the candidate whose soft-mapped distribution is nearest the target
@@ -222,39 +241,75 @@ def _track_candidate(item: dict, dist_vec: np.ndarray) -> dict:
     }
 
 
+def _all_labels(cand_lists: list[list[dict]]) -> list[str]:
+    """Every mood/theme label across all candidates (to batch-embed at once)."""
+    labels: list[str] = []
+    for candidates in cand_lists:
+        for item in candidates:
+            an = item.get("analysis")
+            if not isinstance(an, dict):
+                continue
+            labels += (an.get("moods") or {}).get("main_moods") or []
+            labels += [t.get("theme") for t in ((an.get("themes") or {}).get("main_themes") or [])]
+    return [l for l in labels if l]
+
+
+def _select(target, candidates, used):
+    """Graceful cascade: richsync + popular → richsync (any) → any candidate."""
+    item, vec = find_next_track(target, candidates, used,
+                                require_richsync=True, min_rating=MIN_TRACK_RATING)
+    if item is None:
+        item, vec = find_next_track(target, candidates, used, require_richsync=True)
+    if item is None:
+        item, vec = find_next_track(target, candidates, used, require_richsync=False)
+    return item, vec
+
+
 def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
                      end_node: str | None = None) -> dict:
-    """Build a Trajectory (contract dict): for each operator target, fetch catalog
-    candidates and select the nearest track. transition_reason is left empty for
-    the agent to fill."""
+    """Build a Trajectory (contract dict). The per-target steps are independent,
+    so the catalog calls run in parallel and all candidate labels are embedded in
+    one batch — the slow parts (HTTP + embeddings) are no longer serialized.
+    transition_reason is left empty for the agent to fill."""
     start, targets = operator_targets(shape, seed_mood, n_steps, end_node)
-    used: set = set()
-    steps: list[dict] = []
 
-    for step_i, target in enumerate(targets, 1):
-        candidates = _fetch_candidates(target)
-        # graceful cascade: richsync + popular → richsync (any) → any candidate
-        item, vec = find_next_track(target, candidates, used,
-                                    require_richsync=True, min_rating=MIN_TRACK_RATING)
+    # 1) fetch candidates for every target in parallel (the HTTP bottleneck)
+    with ThreadPoolExecutor(max_workers=min(8, len(targets) or 1)) as ex:
+        cand_lists = list(ex.map(_fetch_candidates, targets))
+
+    # 2) batch-embed every candidate label once (prewarm the soft-map cache)
+    softmap.prewarm(_all_labels(cand_lists))
+
+    # 3) pick the nearest track per step (cache-hot; sequential for the used-set)
+    used: set = set()
+    picks: list[tuple] = []  # (target, item, vec, verse)
+    for target, candidates in zip(targets, cand_lists):
+        item, vec = _select(target, candidates, used)
         if item is None:
-            item, vec = find_next_track(target, candidates, used, require_richsync=True)
-        if item is None:
-            item, vec = find_next_track(target, candidates, used, require_richsync=False)
-        if item is None:
-            log.warning("step %d: no candidate found for target %s", step_i, _target_moods(target))
+            log.warning("no candidate for target %s", _target_moods(target))
             continue
-        track = item["track"]
-        used.add(track.get("commontrack_id"))
+        used.add(item["track"].get("commontrack_id"))
+        picks.append((target, item, vec, _citable_verse(item.get("analysis"), target)))
+
+    # 4) richsync timestamps in parallel (HTTP only)
+    def _ts(pick):
+        _, item, _, verse = pick
+        t = item["track"]
+        return _verse_timestamp(t.get("commontrack_id"), verse) if t.get("has_richsync") else None
+
+    with ThreadPoolExecutor(max_workers=min(8, len(picks) or 1)) as ex:
+        timestamps = list(ex.map(_ts, picks)) if picks else []
+
+    # 5) assemble the steps
+    steps = []
+    for (target, item, vec, verse), ts in zip(picks, timestamps):
         steps.append({
             "target_distribution": {"weights": _to_dict(target)},
             "selected_track": _track_candidate(item, vec),
             "transition_reason": "",  # agent fills this (cites citable_verse)
-            "citable_verse": _citable_verse(item.get("analysis"), target),
-            "timestamp_in_song": None,  # filled from richsync at playback wiring
+            "citable_verse": verse,
+            "timestamp_in_song": ts,  # seconds, from richsync — for the karaoke jump
         })
-        log.info("step %d: %s - %s  (%s)", step_i,
-                 track.get("artist_name"), track.get("track_name"),
-                 softmap.top_nodes(_to_dict(vec), 3))
 
     return {
         "shape": shape,

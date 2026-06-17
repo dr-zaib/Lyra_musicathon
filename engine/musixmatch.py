@@ -19,6 +19,7 @@ import logging
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -38,8 +39,13 @@ class MusixmatchError(RuntimeError):
         super().__init__(f"{method} -> status {status_code}" + (f" ({hint})" if hint else ""))
 
 
+_ENV_PATH = Path(__file__).parent / ".env"
+
+
 def _api_key() -> str:
-    load_dotenv()
+    # load the engine-local .env explicitly, so it works no matter the caller's
+    # cwd (e.g. when the backend imports the engine from a sibling directory)
+    load_dotenv(_ENV_PATH)
     key = os.environ.get("MUSIXMATCH_API_KEY")
     if not key:
         raise RuntimeError("Missing MUSIXMATCH_API_KEY in .env")
@@ -64,6 +70,12 @@ def _get(method: str, **params):
                 time.sleep(wait)
                 continue
             raise
+        except (urllib.error.URLError, TimeoutError) as exc:  # transient network/SSL
+            if attempt < MAX_RETRIES - 1:
+                log.warning("Network error on %s (%s) — retry.", method, exc)
+                time.sleep(2 ** (attempt + 1))
+                continue
+            raise MusixmatchError(method, "network", str(exc))
     header = (payload or {}).get("message", {}).get("header", {})
     status = header.get("status_code")
     if status != 200:
@@ -93,6 +105,12 @@ def _post(method: str, data: dict, **query):
                 time.sleep(wait)
                 continue
             raise
+        except (urllib.error.URLError, TimeoutError) as exc:  # transient network/SSL
+            if attempt < MAX_RETRIES - 1:
+                log.warning("Network error on %s (%s) — retry.", method, exc)
+                time.sleep(2 ** (attempt + 1))
+                continue
+            raise MusixmatchError(method, "network", str(exc))
         header = payload.get("message", {}).get("header", {})
         status = header.get("status_code")
         # Musixmatch sometimes wraps a transient failure in a 200 envelope + 5xx code
@@ -159,3 +177,18 @@ def get_lyrics(commontrack_id: int | str) -> dict | None:
     """track.lyrics.get → the `lyrics` object. Musixmatch CONTENT."""
     body = _get("track.lyrics.get", commontrack_id=commontrack_id)
     return (body or {}).get("lyrics")
+
+
+def richsync_lines(commontrack_id: int | str) -> list[dict]:
+    """Parsed richsync as [{ts, te, text}] — timed lyric lines (ts/te in seconds).
+    Used to find the timestamp of a citable verse for the karaoke jump.
+    Musixmatch CONTENT → in-memory only."""
+    rs = get_richsync(commontrack_id)
+    body = (rs or {}).get("richsync_body")
+    if not body:
+        return []
+    try:
+        raw = json.loads(body)
+    except (ValueError, TypeError):
+        return []
+    return [{"ts": ln.get("ts"), "te": ln.get("te"), "text": ln.get("x", "")} for ln in raw]
