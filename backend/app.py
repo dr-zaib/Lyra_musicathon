@@ -55,9 +55,12 @@ class RecommendRequest(AgentTurnRequest):
     shape: str = "deepen"
 
 
-def _engine_trajectory(seed_mood: str, shape: str, end_mood: str | None = None) -> Trajectory:
-    """Real engine → validated Trajectory, then the agent voices transition_reason."""
-    traj = Trajectory(**build_trajectory(seed_mood, shape, n_steps=N_STEPS, end_node=end_mood))
+def _engine_trajectory(seed_mood: str, shape: str, end_mood: str | None = None,
+                       shuffle: float = 0.0) -> Trajectory:
+    """Real engine → validated Trajectory, then the agent voices transition_reason.
+    `shuffle` = the serendipity fraction (go-to ∪ discovery) from the intent."""
+    traj = Trajectory(**build_trajectory(seed_mood, shape, n_steps=N_STEPS,
+                                         end_node=end_mood, shuffle=shuffle))
     return agent.narrate(traj)
 
 
@@ -97,7 +100,7 @@ def turn(req: AgentTurnRequest) -> AgentTurn:
         shuffle, confidence, message = intent["shuffle"], intent["confidence"], intent["message"]
         end_mood = intent.get("end_mood")
 
-    trajectory = _engine_trajectory(seed, shape, end_mood)
+    trajectory = _engine_trajectory(seed, shape, end_mood, shuffle)
 
     return AgentTurn(
         message=message,

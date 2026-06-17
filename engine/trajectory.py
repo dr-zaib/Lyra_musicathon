@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -290,25 +291,139 @@ def _select(target, candidates, used, banned_artists=frozenset(), banned_isrcs=f
     return item, vec
 
 
-def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
-                     end_node: str | None = None) -> dict:
-    """Build a Trajectory (contract dict). The per-target steps are independent,
-    so the catalog calls run in parallel and all candidate labels are embedded in
-    one batch — the slow parts (HTTP + embeddings) are no longer serialized.
-    transition_reason is left empty for the agent to fill."""
-    start, targets = operator_targets(shape, seed_mood, n_steps, end_node)
+# ---- serendipity pool (shuffle): go-to ∪ new-but-similar discovery ----------
+MXM_MOODS = {
+    "Love", "Heartbreak", "Joy", "Empowerment", "Angst", "Reflection", "Inspiration",
+    "Nostalgia", "Despair", "Celebration", "Anger", "Peace", "Solitude", "Adventure",
+    "Social Commentary", "Hope", "Spirituality", "Freedom", "Party", "Nature",
+}
+_GO_TO_PATH = Path(__file__).parent / "data" / "seed_enriched.json"
 
-    # 1) fetch candidates for every target in parallel (the HTTP bottleneck)
+
+def load_go_to() -> list[dict]:
+    """The user's go-to pool (the seed from their own playlists), with lyrics analysis.
+    In production this is the host DSP's user profile."""
+    try:
+        seed = json.loads(_GO_TO_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    return [t for t in seed if t.get("commontrack_id") and t.get("mxm_has_lyrics")]
+
+
+def _norm_mood(m: str) -> str | None:
+    t = " ".join(w.capitalize() for w in (m or "").split())
+    return t if t in MXM_MOODS else None
+
+
+def _go_to_item(track: dict) -> dict:
+    """analysis.get a go-to track → a {track, analysis} item shaped like a search hit."""
+    try:
+        an = mxm.get_analysis(track["commontrack_id"])
+    except Exception:
+        an = None
+    return {
+        "track": {
+            "track_id": track.get("mxm_track_id"),
+            "commontrack_id": track["commontrack_id"],
+            "artist_name": track.get("artist"),
+            "track_name": track.get("title"),
+            "track_isrc": track.get("isrc"),
+            "track_spotify_id": track.get("spotify_id"),
+            "has_richsync": bool(track.get("mxm_has_richsync")),
+            "track_rating": track.get("spotify_popularity") or 0,
+            "album_coverart_350x350": None,
+        },
+        "analysis": an if isinstance(an, dict) else {},
+    }
+
+
+def _taste_moods(go_to: list[dict], k: int = 3) -> list[str]:
+    """Sample a few go-to tracks → their Musixmatch moods = the user's taste seed."""
+    moods: list[str] = []
+    for t in random.sample(go_to, min(k, len(go_to))):
+        try:
+            an = mxm.get_analysis(t["commontrack_id"])
+        except Exception:
+            an = None
+        if isinstance(an, dict):
+            for m in (an.get("moods") or {}).get("main_moods") or []:
+                nm = _norm_mood(m)
+                if nm and nm not in moods:
+                    moods.append(nm)
+    return moods[:5] or ["Reflection"]
+
+
+def _discovery_pool(go_to, exclude_ctids, banned_artists, banned_isrcs) -> list[dict]:
+    """New-but-similar: analysis.search seeded by the user's taste, OPEN popularity
+    (niche welcome), excluding the go-to themselves + used + banned."""
+    try:
+        items = mxm.search_analysis({"moods": _taste_moods(go_to), "lyrics_language": "en"},
+                                    page_size=CANDIDATES_PER_STEP)
+    except mxm.MusixmatchError:
+        items = []
+    pool = []
+    for it in items:
+        tr = it.get("track") or {}
+        ctid = tr.get("commontrack_id")
+        if (not ctid or ctid in exclude_ctids
+                or (tr.get("artist_name") or "").lower().strip() in banned_artists
+                or (tr.get("track_isrc") or "") in banned_isrcs
+                or not isinstance(it.get("analysis"), dict)):
+            continue
+        pool.append(it)
+    return pool
+
+
+def _serendipity_picks(n, used, banned_artists, banned_isrcs, go_to) -> list[tuple]:
+    """n serendipity picks alternating comfort (go-to) and discovery (new-but-similar).
+    Each pick's OWN distribution is its 'target' (serendipity isn't aimed)."""
+    if n <= 0 or not go_to:
+        return []
+    go_ctids = {t["commontrack_id"] for t in go_to}
+    discovery = _discovery_pool(go_to, used | go_ctids, banned_artists, banned_isrcs)
+    random.shuffle(discovery)
+    go_pool = [t for t in go_to
+               if (t.get("artist") or "").lower().strip() not in banned_artists
+               and (t.get("isrc") or "") not in banned_isrcs]
+    random.shuffle(go_pool)
+
+    picks, di = [], 0
+    for i in range(n):
+        item = None
+        if i % 2 == 0:  # comfort (go-to) on even slots
+            while go_pool:
+                cand = go_pool.pop()
+                if cand["commontrack_id"] in used:
+                    continue
+                cand_item = _go_to_item(cand)
+                if isinstance(cand_item.get("analysis"), dict) and cand_item["analysis"]:
+                    item = cand_item
+                    break
+        if item is None:  # discovery (or go-to exhausted)
+            while di < len(discovery):
+                cand = discovery[di]; di += 1
+                if (cand.get("track") or {}).get("commontrack_id") not in used:
+                    item = cand
+                    break
+        if item is None:
+            continue
+        used.add(item["track"]["commontrack_id"])
+        an = item.get("analysis")
+        dist = softmap.analysis_to_distribution(an if isinstance(an, dict) else {})
+        vec = np.array([dist[nn] for nn in NODE_NAMES])
+        picks.append((vec, item, vec, _citable_verse(an, vec)))
+    return picks
+
+
+def _targeted_picks(seed_mood, shape, n, end_node, used, banned_artists, banned_isrcs) -> list[tuple]:
+    """The aimed part of the journey: n steps toward the operator's targets."""
+    if n <= 0:
+        return []
+    _, targets = operator_targets(shape, seed_mood, n, end_node)
     with ThreadPoolExecutor(max_workers=min(8, len(targets) or 1)) as ex:
         cand_lists = list(ex.map(_fetch_candidates, targets))
-
-    # 2) batch-embed every candidate label once (prewarm the soft-map cache)
     softmap.prewarm(_all_labels(cand_lists))
-
-    # 3) pick the nearest track per step (cache-hot; sequential for the used-set)
-    banned_artists, banned_isrcs = load_user_prefs()
-    used: set = set()
-    picks: list[tuple] = []  # (target, item, vec, verse)
+    picks = []
     for target, candidates in zip(targets, cand_lists):
         item, vec = _select(target, candidates, used, banned_artists, banned_isrcs)
         if item is None:
@@ -316,8 +431,27 @@ def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
             continue
         used.add(item["track"].get("commontrack_id"))
         picks.append((target, item, vec, _citable_verse(item.get("analysis"), target)))
+    return picks
 
-    # 4) richsync timestamps in parallel (HTTP only)
+
+def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
+                     end_node: str | None = None, shuffle: float = 0.0) -> dict:
+    """Build a Trajectory (contract dict). `shuffle` (0..1) is the serendipity
+    fraction: that share of the journey is drawn from the user's go-to ∪ discovery
+    (comfort + new-but-similar), the rest is aimed at the trajectory's targets.
+    transition_reason is left empty for the agent to fill."""
+    shuffle = max(0.0, min(1.0, shuffle))
+    n_ser = round(shuffle * n_steps)
+    n_tgt = n_steps - n_ser
+
+    banned_artists, banned_isrcs = load_user_prefs()
+    used: set = set()
+
+    picks = _targeted_picks(seed_mood, shape, n_tgt, end_node, used, banned_artists, banned_isrcs)
+    if n_ser > 0:
+        picks += _serendipity_picks(n_ser, used, banned_artists, banned_isrcs, load_go_to())
+
+    # richsync timestamps in parallel (HTTP only)
     def _ts(pick):
         _, item, _, verse = pick
         t = item["track"]
@@ -326,7 +460,8 @@ def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
     with ThreadPoolExecutor(max_workers=min(8, len(picks) or 1)) as ex:
         timestamps = list(ex.map(_ts, picks)) if picks else []
 
-    # 5) assemble the steps
+    # assemble the steps
+    start = operator_targets(shape, seed_mood, 1, end_node)[0]
     steps = []
     for (target, item, vec, verse), ts in zip(picks, timestamps):
         steps.append({
