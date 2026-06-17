@@ -321,20 +321,13 @@ export default function SplitView() {
       isPlaying={isPlaying} currentTime={currentTime} duration={duration}
       hasPrev={index > 0} hasNext={index < queue.length - 1}
       onToggle={toggle} onPrev={prev} onNext={next} onSeek={seek}
+      onOpenPlaylist={() => setPlaylistOpen(true)}
     />
   ) : null;
 
   const iconBtn = "flex h-10 w-10 items-center justify-center rounded-full text-muted transition hover:bg-bg-elev hover:text-fg";
   const controls = (canReset: boolean) => (
     <div className="flex items-center">
-      {playing && (
-        <button onClick={() => setPlaylistOpen(true)} aria-label="view playlist" title="view playlist" className={iconBtn}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <line x1="4" y1="7" x2="15" y2="7" /><line x1="4" y1="12" x2="15" y2="12" /><line x1="4" y1="17" x2="11" y2="17" />
-            <circle cx="18" cy="16" r="2.5" /><line x1="20.5" y1="16" x2="20.5" y2="8.5" /><path d="M20.5 8.5 L16.5 9.7" />
-          </svg>
-        </button>
-      )}
       <button onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings" className={`${iconBtn} text-lg`}>⚙</button>
       {canReset && (
         <button onClick={reset} aria-label="start over" title="start over" className={`${iconBtn} text-lg`}>↺</button>
