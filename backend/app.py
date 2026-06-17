@@ -33,8 +33,8 @@ from schema import (  # noqa: E402
 )
 
 # SWAP DONE: real engine (engine/) via the bridge, instead of mock_engine
-from engine_bridge import build_trajectory, text_to_intent  # noqa: E402
-from agent import narrate  # noqa: E402
+from engine_bridge import build_trajectory  # noqa: E402
+import agent  # noqa: E402  (real datapizza+Claude agent: interpret + narrate)
 
 app = FastAPI(title="Lyra backend")
 
@@ -55,10 +55,10 @@ class RecommendRequest(AgentTurnRequest):
     shape: str = "deepen"
 
 
-def _engine_trajectory(seed_mood: str, shape: str) -> Trajectory:
-    """Real engine → validated Trajectory, with the stub agent narration."""
-    traj = Trajectory(**build_trajectory(seed_mood, shape, n_steps=N_STEPS))
-    return narrate(traj)  # stub: fills transition_reason (real agent replaces it)
+def _engine_trajectory(seed_mood: str, shape: str, end_mood: str | None = None) -> Trajectory:
+    """Real engine → validated Trajectory, then the agent voices transition_reason."""
+    traj = Trajectory(**build_trajectory(seed_mood, shape, n_steps=N_STEPS, end_node=end_mood))
+    return agent.narrate(traj)
 
 
 @app.get("/health")
@@ -73,23 +73,26 @@ def recommend(req: RecommendRequest) -> Trajectory:
 
 @app.post("/turn", response_model=AgentTurn)
 def turn(req: AgentTurnRequest) -> AgentTurn:
-    """One conversational turn. STUB agent: intent from a click (seed_mood) or
-    from text via the embedding stub; `message` is empty until the LLM agent."""
+    """One conversational turn. Intent from a click (seed_mood) or from the text
+    via the agent (LLM); the engine then builds the journey."""
     if req.seed_mood:
-        seed = req.seed_mood
-        distribution = {seed: 1.0}
-        confidence = 1.0
+        seed, shape = req.seed_mood, (req.shape or "deepen")
+        distribution, shuffle, confidence, message = {seed: 1.0}, 0.0, 1.0, ""
+        end_mood = None
     else:
-        distribution, confidence = text_to_intent(req.message or "")
-        seed = max(distribution, key=distribution.get) if distribution else "Melancholia"
+        intent = agent.interpret(req.message or "")
+        seed = intent["seed_mood"]
+        shape = req.shape or intent["shape"]
+        distribution = intent["distribution"]
+        shuffle, confidence, message = intent["shuffle"], intent["confidence"], intent["message"]
+        end_mood = intent.get("end_mood")
 
-    shape = req.shape or "deepen"
-    trajectory = _engine_trajectory(seed, shape)
+    trajectory = _engine_trajectory(seed, shape, end_mood)
 
     return AgentTurn(
-        message="",  # the agent's voice — filled once the LLM agent is wired
+        message=message,
         confidence=confidence,
         distribution=NodeDistribution(weights=distribution),
-        shuffle=0.0,  # the real agent derives shuffle; stub leaves none
+        shuffle=shuffle,
         trajectory=trajectory,
     )
