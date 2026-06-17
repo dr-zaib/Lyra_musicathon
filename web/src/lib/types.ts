@@ -82,3 +82,40 @@ export interface AgentTurn {
   shuffle: number;
   trajectory?: Trajectory | null;
 }
+
+// --- playback flow: split seam (instant first audio, then the journey) ---------
+// /entry → mood read + a skippable list of entry candidates (player starts [0]);
+// /journey → the playlist for a chosen shape (queued behind the entry track);
+// /refill → more candidates seeded on the centroid of what's left.
+// known_new = fraction of NEW (discovery) vs KNOWN (go-to); engine floors it ≈0.15.
+export interface EntryRequest {
+  message?: string | null;
+  session_id?: string | null;
+  seed_mood?: MacroNode | null; // click-a-node shortcut
+  n?: number;                   // how many entry candidates (default 6)
+  known_new?: number | null;    // % new (discovery); null → default
+}
+
+export interface EntryResponse {
+  confidence: number;
+  distribution: NodeDistribution;
+  shuffle: number;
+  entry_candidates: TrackCandidate[];
+}
+
+export interface JourneyRequest {
+  seed_mood: MacroNode;
+  shape: TrajectoryShape;
+  end_mood?: MacroNode | null;
+  exclude_isrcs?: string[]; // already played (entry track + skips)
+  known_new?: number | null;
+  session_id?: string | null;
+}
+
+export interface RefillRequest {
+  remaining: TrackCandidate[]; // what's left in the queue (centroid seed)
+  exclude_isrcs?: string[];
+  n?: number;
+  known_new?: number | null;
+  session_id?: string | null;
+}
