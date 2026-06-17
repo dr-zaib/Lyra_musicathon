@@ -5,9 +5,40 @@
 //  - variant "panel"    → desktop split (bordered card)
 //  - variant "floating" → mobile living-background (frosted, over the scrim)
 
+import { useEffect, useState } from "react";
+
 import type { Trajectory } from "@/lib/types";
 
 export type Msg = { role: "agent" | "user"; text: string };
+
+// While a turn is in flight (~14s on the real backend) Lyra "thinks" — dots + a
+// rotating status line so the wait never looks stuck.
+const THINKING = ["reading the feeling…", "walking the catalog…", "citing the line…"];
+function ThinkingIndicator({ floating }: { floating: boolean }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((n) => (n + 1) % THINKING.length), 2500);
+    return () => clearInterval(id);
+  }, []);
+  const bubble = floating
+    ? "border border-white/10 bg-white/[0.04]"
+    : "bg-bg-elev/70";
+  return (
+    <div
+      className={`flex max-w-[80%] items-center gap-2 rounded-xl px-3 py-2.5 ${bubble}`}
+      role="status"
+      aria-live="polite"
+      aria-label="lyra is thinking"
+    >
+      <span className="flex gap-1">
+        <span className="lyra-typing-dot" />
+        <span className="lyra-typing-dot" />
+        <span className="lyra-typing-dot" />
+      </span>
+      <span className="text-xs text-muted">{THINKING[i]}</span>
+    </div>
+  );
+}
 
 export default function ConversationPanel({
   variant,
@@ -57,13 +88,7 @@ export default function ConversationPanel({
           </div>
         ))}
 
-        {pending && (
-          <div className={`flex max-w-[60%] gap-1 rounded-xl px-3 py-3 ${agentBubble}`} aria-label="lyra is thinking">
-            <span className="lyra-typing-dot" />
-            <span className="lyra-typing-dot" />
-            <span className="lyra-typing-dot" />
-          </div>
-        )}
+        {pending && <ThinkingIndicator floating={floating} />}
       </div>
 
       <div className={`px-4 pt-3 ${floating ? "" : "border-t border-border"}`}>
