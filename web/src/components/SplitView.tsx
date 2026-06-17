@@ -28,10 +28,13 @@ import type {
 
 type QueueItem = { track: TrackCandidate; verse: string | null; reason: string | null };
 
-// Musixmatch gives no audio → enrich each track with an iTunes 30s preview client-side.
+// Musixmatch gives no audio → enrich each track with a 30s preview client-side.
+// ISRC-first (Deezer exact match), text fallback — the route handles the strategy.
 async function enrichTrack(t: TrackCandidate): Promise<TrackCandidate> {
   try {
-    const r = await fetch(`/api/preview?artist=${encodeURIComponent(t.artist)}&title=${encodeURIComponent(t.title)}`);
+    const q = new URLSearchParams({ artist: t.artist, title: t.title });
+    if (t.isrc) q.set("isrc", t.isrc);
+    const r = await fetch(`/api/preview?${q.toString()}`);
     const d = await r.json();
     return { ...t, preview_url: d.preview_url ?? null, artwork_url: d.artwork_url ?? null };
   } catch {
