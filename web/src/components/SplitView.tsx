@@ -171,8 +171,9 @@ export default function SplitView() {
 
         {/* chat is the primary surface */}
         <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-          <div className="px-4 pt-4">
+          <div className="flex items-baseline gap-2 px-4 pt-4">
             <span className="font-display text-xl font-medium lowercase tracking-tight">lyra</span>
+            <span className="text-[11px] text-muted-2">the lyrics layer for your player</span>
           </div>
           <div className="min-h-0 flex-1">
             <ConversationPanel variant="floating" {...convoProps} />
@@ -189,7 +190,7 @@ export default function SplitView() {
           <section className="flex w-1/2 flex-col">
             <div className="mb-2 flex items-baseline gap-3">
               <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra</span>
-              <span className="text-xs text-muted-2">your emotional map</span>
+              <span className="text-xs text-muted-2">the lyrics layer for your player</span>
               {(canStart || trajectory) && (
                 <button onClick={reset} aria-label="start over" title="start over" className="ml-auto text-base text-muted-2 transition hover:text-fg">↺</button>
               )}

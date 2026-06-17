@@ -53,7 +53,9 @@ export default function PlayerBar({
           {track && (
             <>
               <div className="truncate text-sm font-medium">{track.title}</div>
-              <div className="truncate text-xs text-muted">{track.artist}</div>
+              <div className="truncate text-xs text-muted">
+                {track.artist} <span className="text-muted-2">· 30s preview → your player</span>
+              </div>
             </>
           )}
         </div>
