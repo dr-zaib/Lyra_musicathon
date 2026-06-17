@@ -14,8 +14,10 @@ never persisted. Only identifiers flow into the (transient) response.
 """
 from __future__ import annotations
 
+import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import numpy as np
 
@@ -24,6 +26,21 @@ import softmap
 from taxonomy import NODE_NAMES, NODES
 
 log = logging.getLogger("lyra.trajectory")
+
+_PREFS_PATH = Path(__file__).parent / "data" / "user_prefs.json"
+
+
+def load_user_prefs() -> tuple[set, set]:
+    """Read the user's ban-list → (banned_artists lowercased, banned_isrcs).
+    Respect-by-design: Lyra must never recommend what the user has banned.
+    In production this is owned by the host DSP; here it's a local JSON."""
+    try:
+        p = json.loads(_PREFS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        p = {}
+    banned_artists = {a.lower().strip() for a in p.get("banned_artists", []) if a}
+    banned_isrcs = {s.strip() for s in p.get("banned_isrcs", []) if s}
+    return banned_artists, banned_isrcs
 
 # circumplex ring order (mirrors web EmotionWheel ORDER) — for neighbours/defaults
 RING = [
@@ -198,9 +215,10 @@ def _verse_timestamp(commontrack_id, verse: str | None) -> float | None:
 
 
 def find_next_track(target: np.ndarray, candidates: list[dict], used: set,
-                    require_richsync: bool = False, min_rating: int = 0):
+                    require_richsync: bool = False, min_rating: int = 0,
+                    banned_artists: set = frozenset(), banned_isrcs: set = frozenset()):
     """Pick the candidate whose soft-mapped distribution is nearest the target
-    (Euclidean), skipping used tracks and those below the popularity floor.
+    (Euclidean), skipping used / banned tracks and those below the popularity floor.
     Returns (item, distribution_vec) or (None, None)."""
     best, best_vec, best_d = None, None, 1e9
     for item in candidates:
@@ -212,6 +230,11 @@ def find_next_track(target: np.ndarray, candidates: list[dict], used: set,
         if require_richsync and not track.get("has_richsync"):
             continue
         if (track.get("track_rating") or 0) < min_rating:
+            continue
+        # respect-by-design: never recommend a banned artist / track
+        if (track.get("artist_name") or "").lower().strip() in banned_artists:
+            continue
+        if (track.get("track_isrc") or "") in banned_isrcs:
             continue
         dist = softmap.analysis_to_distribution(analysis)
         vec = np.array([dist[n] for n in NODE_NAMES])
@@ -254,14 +277,16 @@ def _all_labels(cand_lists: list[list[dict]]) -> list[str]:
     return [l for l in labels if l]
 
 
-def _select(target, candidates, used):
-    """Graceful cascade: richsync + popular → richsync (any) → any candidate."""
+def _select(target, candidates, used, banned_artists=frozenset(), banned_isrcs=frozenset()):
+    """Graceful cascade: richsync + popular → richsync (any) → any candidate.
+    The ban-list is enforced at every tier (never relaxed)."""
+    ban = dict(banned_artists=banned_artists, banned_isrcs=banned_isrcs)
     item, vec = find_next_track(target, candidates, used,
-                                require_richsync=True, min_rating=MIN_TRACK_RATING)
+                                require_richsync=True, min_rating=MIN_TRACK_RATING, **ban)
     if item is None:
-        item, vec = find_next_track(target, candidates, used, require_richsync=True)
+        item, vec = find_next_track(target, candidates, used, require_richsync=True, **ban)
     if item is None:
-        item, vec = find_next_track(target, candidates, used, require_richsync=False)
+        item, vec = find_next_track(target, candidates, used, require_richsync=False, **ban)
     return item, vec
 
 
@@ -281,10 +306,11 @@ def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
     softmap.prewarm(_all_labels(cand_lists))
 
     # 3) pick the nearest track per step (cache-hot; sequential for the used-set)
+    banned_artists, banned_isrcs = load_user_prefs()
     used: set = set()
     picks: list[tuple] = []  # (target, item, vec, verse)
     for target, candidates in zip(targets, cand_lists):
-        item, vec = _select(target, candidates, used)
+        item, vec = _select(target, candidates, used, banned_artists, banned_isrcs)
         if item is None:
             log.warning("no candidate for target %s", _target_moods(target))
             continue

@@ -1,0 +1,5 @@
+{
+  "_doc": "User preferences (the host DSP owns this in production). banned_artists: artist names (case-insensitive) Lyra must never recommend. banned_isrcs: specific tracks to exclude. Respect-by-design.",
+  "banned_artists": [],
+  "banned_isrcs": []
+}
