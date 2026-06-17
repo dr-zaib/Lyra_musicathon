@@ -71,6 +71,8 @@ HIGH_AROUSAL = ["Anger", "Empowerment", "Defiance", "Joy", "Anxiety"]
 
 CANDIDATES_PER_STEP = 60    # wide enough to filter by popularity + nearest, fast to embed
 MIN_TRACK_RATING = 20       # popularity floor — surface recognizable tracks (0–100)
+DEFAULT_EXPLORE = 0.5       # known/new split default: half new (discovery), half go-to
+EXPLORE_FLOOR = 0.15        # always ≥15% new — no filter bubble (settings can't go below)
 
 
 # ---- distribution helpers ---------------------------------------------------
@@ -434,8 +436,161 @@ def _targeted_picks(seed_mood, shape, n, end_node, used, banned_artists, banned_
     return picks
 
 
+# ---- entry list + refill (the playback flow's instant-audio + skip) ---------
+def _explore(known_new: float | None) -> float:
+    """Resolve the known/new ratio to a NEW fraction, never below the floor."""
+    kn = DEFAULT_EXPLORE if known_new is None else known_new
+    return max(EXPLORE_FLOOR, min(1.0, kn))
+
+
+def _resolve_target(distribution: dict | None, seed_mood: str | None) -> np.ndarray:
+    """A target vector from an intent distribution (preferred) or a seed mood."""
+    if distribution:
+        v = np.array([float(distribution.get(n, 0.0)) for n in NODE_NAMES])
+        if v.sum() > 0:
+            return _normalize(v)
+    if seed_mood:
+        return _soft_start(seed_mood)
+    return np.full(len(NODE_NAMES), 1.0 / len(NODE_NAMES))
+
+
+def _rank_items(items, target, exclude_ctids, banned_artists, banned_isrcs):
+    """Soft-map each {track, analysis} item and rank by nearness to target.
+    Returns [(distance, item, vec)] sorted closest-first, ban/exclude filtered."""
+    scored = []
+    for it in items:
+        tr = it.get("track") or {}
+        ctid = tr.get("commontrack_id")
+        an = it.get("analysis")
+        if (not ctid or ctid in exclude_ctids or not isinstance(an, dict) or not an
+                or (tr.get("artist_name") or "").lower().strip() in banned_artists
+                or (tr.get("track_isrc") or "") in banned_isrcs):
+            continue
+        dist = softmap.analysis_to_distribution(an)
+        vec = np.array([dist[n] for n in NODE_NAMES])
+        scored.append((float(np.linalg.norm(vec - target)), it, vec))
+    scored.sort(key=lambda x: x[0])
+    return scored
+
+
+def _new_ranked(target, exclude_ctids, banned_artists, banned_isrcs):
+    """NEW pool: catalog candidates for the target (analysis.search), ranked."""
+    items = _fetch_candidates(target)
+    softmap.prewarm(_all_labels([items]))
+    return _rank_items(items, target, exclude_ctids, banned_artists, banned_isrcs)
+
+
+def _known_ranked(target, n_known, banned_artists, banned_isrcs, go_to, exclude_ctids):
+    """KNOWN pool: a sample of the user's go-to, analyzed in parallel and ranked
+    by nearness to the target (so 'known' is also mood-coherent). The sample is
+    kept small (≈3× the slots) so the live analysis.get calls stay fast."""
+    if n_known <= 0 or not go_to:
+        return []
+    pool = [t for t in go_to if t["commontrack_id"] not in exclude_ctids]
+    sample = random.sample(pool, min(len(pool), max(6, n_known * 3)))
+    with ThreadPoolExecutor(max_workers=min(12, len(sample) or 1)) as ex:
+        items = list(ex.map(_go_to_item, sample))
+    softmap.prewarm(_all_labels([items]))
+    return _rank_items(items, target, exclude_ctids, banned_artists, banned_isrcs)
+
+
+def _pools_parallel(target, n_new, n_known, banned_artists, banned_isrcs,
+                    go_to, new_exclude, known_exclude):
+    """Fetch the NEW and KNOWN pools concurrently (independent HTTP) — the entry
+    list's latency becomes max(new, known), not their sum."""
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        fu_new = ex.submit(_new_ranked, target, new_exclude, banned_artists, banned_isrcs)
+        fu_known = ex.submit(_known_ranked, target, n_known, banned_artists, banned_isrcs,
+                             go_to, known_exclude)
+        new_ranked = fu_new.result()[: n_new + 3]
+        known_ranked = fu_known.result()[: n_known + 2]
+    return new_ranked, known_ranked
+
+
+def _interleave(new_ranked, known_ranked, n) -> list[dict]:
+    """Weave new + known into n TrackCandidate dicts (new first = strongest mood
+    match for the instant entry track), de-duped, preserving the known/new counts."""
+    out, used = [], set()
+    ni = ki = 0
+    take_new = True
+    while len(out) < n and (ni < len(new_ranked) or ki < len(known_ranked)):
+        src = new_ranked if (take_new and ni < len(new_ranked)) else known_ranked
+        if src is known_ranked and ki >= len(known_ranked):
+            src = new_ranked
+        if src is new_ranked:
+            if ni >= len(new_ranked):
+                take_new = False
+                continue
+            _, item, vec = new_ranked[ni]; ni += 1
+        else:
+            _, item, vec = known_ranked[ki]; ki += 1
+        ctid = item["track"].get("commontrack_id")
+        if ctid in used:
+            continue
+        used.add(ctid)
+        out.append(_track_candidate(item, vec))
+        take_new = not take_new
+    return out
+
+
+def entry_candidates(seed_mood: str | None = None, distribution: dict | None = None,
+                     n: int = 6, known_new: float | None = None) -> list[dict]:
+    """A skippable list of N entry candidates for a mood — mood-coherent, mixing
+    KNOWN (go-to) and NEW (discovery) per the known/new ratio. The player starts
+    candidate[0] immediately and lets the user skip down the list."""
+    target = _resolve_target(distribution, seed_mood)
+    explore = _explore(known_new)
+    n_new = min(n, max(round(explore * n), 1))
+    n_known = n - n_new
+
+    banned_artists, banned_isrcs = load_user_prefs()
+    go_to = load_go_to()
+    go_ctids = {t["commontrack_id"] for t in go_to}
+
+    new_ranked, known_ranked = _pools_parallel(
+        target, n_new, n_known, banned_artists, banned_isrcs, go_to,
+        new_exclude=go_ctids, known_exclude=set())
+    return _interleave(new_ranked, known_ranked, n)
+
+
+def _centroid(remaining: list[dict]) -> np.ndarray:
+    """The mean distribution of the remaining candidates — seeds the refill search
+    so the queue drifts toward what the user has NOT skipped (similarity)."""
+    vecs = []
+    for tc in remaining or []:
+        w = (tc.get("distribution") or {}).get("weights") or {}
+        v = np.array([float(w.get(n, 0.0)) for n in NODE_NAMES])
+        if v.sum() > 0:
+            vecs.append(v)
+    if not vecs:
+        return np.full(len(NODE_NAMES), 1.0 / len(NODE_NAMES))
+    return _normalize(np.mean(vecs, axis=0))
+
+
+def refill_candidates(remaining: list[dict], exclude_isrcs: list[str] | None = None,
+                      n: int = 6, known_new: float | None = None) -> list[dict]:
+    """More candidates seeded on the centroid of what's left in the queue (so the
+    list stays similar to the un-skipped tracks), same known/new mix. Append these
+    to the player's queue when it drops below ~3."""
+    target = _centroid(remaining)
+    explore = _explore(known_new)
+    n_new = min(n, max(round(explore * n), 1))
+    n_known = n - n_new
+
+    banned_artists, banned_isrcs = load_user_prefs()
+    banned_isrcs = banned_isrcs | set(exclude_isrcs or [])
+    go_to = load_go_to()
+    go_ctids = {t["commontrack_id"] for t in go_to}
+
+    new_ranked, known_ranked = _pools_parallel(
+        target, n_new, n_known, banned_artists, banned_isrcs, go_to,
+        new_exclude=go_ctids, known_exclude=set())
+    return _interleave(new_ranked, known_ranked, n)
+
+
 def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
-                     end_node: str | None = None, shuffle: float = 0.0) -> dict:
+                     end_node: str | None = None, shuffle: float = 0.0,
+                     exclude_isrcs: list[str] | None = None) -> dict:
     """Build a Trajectory (contract dict). `shuffle` (0..1) is the serendipity
     fraction: that share of the journey is drawn from the user's go-to ∪ discovery
     (comfort + new-but-similar), the rest is aimed at the trajectory's targets.
@@ -445,6 +600,7 @@ def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
     n_tgt = n_steps - n_ser
 
     banned_artists, banned_isrcs = load_user_prefs()
+    banned_isrcs = banned_isrcs | set(exclude_isrcs or [])  # already-played (entry/skips)
     used: set = set()
 
     picks = _targeted_picks(seed_mood, shape, n_tgt, end_node, used, banned_artists, banned_isrcs)

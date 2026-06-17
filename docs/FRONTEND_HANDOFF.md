@@ -101,18 +101,26 @@ new (discovery). Expose a **settings slider** (% known↔new) with an **automati
   current position) — we'll expose a small endpoint; you wire the trigger (node click /
   track end). Coordinate with Axel before building.
 
-## Engine endpoints (Axel will provide — for the playback flow)
-- **Today**: `POST /turn` (`AgentTurnRequest` → `AgentTurn`) returns a full trajectory in one
-  call (~14s). You can ship the demo on this + a loading state if the split isn't ready in time.
-- **Coming (for the flow above)** — being split so the first audio is instant:
-  - `POST /entry` : `{ message }` → `{ distribution, confidence, shuffle, entry_candidates: TrackCandidate[] }`
-    (fast: mood read + N entry candidates, known/new ratio). You play candidate[0], skip → [1]…
-  - `POST /journey` : `{ seed_mood|distribution, shape, exclude: [ids], known_new? }` → `Trajectory`
-    (the playlist, excluding what already played; queue it behind the entry track).
-  - `POST /refill` (optional) : `{ remaining: TrackCandidate[], exclude, known_new? }` → `TrackCandidate[]`
-    (more candidates seeded on the centroid of `remaining`, when the queue drops below ~3).
-  Exact field names will be mirrored in `shared/schema.py` ↔ `types.ts` when I build them —
-  **don't hardcode against these yet; coordinate.**
+## Engine endpoints (LIVE on branch `playback-flow` — field names LOCKED)
+Types are mirrored in `shared/schema.py` ↔ `web/src/lib/types.ts` — **you can wire against
+these now.** (HTTP-validated end-to-end; the agent's intent/narration need Anthropic credits,
+but the engine path works regardless.)
+- `POST /entry` — `EntryRequest { message?, seed_mood?, n=6, known_new? }` →
+  `EntryResponse { confidence, distribution, shuffle, entry_candidates: TrackCandidate[] }`.
+  Play `entry_candidates[0]` immediately; skip → `[1]`… The list is mood-coherent, mixing
+  known (go-to) + new (discovery). **Latency ≈ 7s warm / 12s cold — NOT ~1s** (matching go-to to
+  the mood needs live analysis). Still well under the old 14s, and the first preview then hides
+  the journey gen. Show a brief "finding your opening track…" for those seconds.
+- `POST /journey` — `JourneyRequest { seed_mood, shape, end_mood?, exclude_isrcs[], known_new? }`
+  → `Trajectory` (narrated). Pass the ISRCs already played (entry + skips) in `exclude_isrcs`;
+  queue the result behind the entry track.
+- `POST /refill` — `RefillRequest { remaining: TrackCandidate[], exclude_isrcs[], n=6, known_new? }`
+  → `TrackCandidate[]` (seeded on the centroid of `remaining`). Call when the queue drops below ~3.
+- `POST /turn` still exists (one-shot `AgentTurn`) — fine as a fallback / simplest path.
+
+> **Note on `/entry` speed**: ~7s isn't instant. If we want it snappier we can return the single
+> best NEW candidate first (one search ~4s) and fill known in the background — tell me if the UX
+> needs that. Don't over-build around a 1s assumption.
 
 ## Don't break
 - The contract field names (`shared/schema.py` ↔ `web/src/lib/types.ts`) — change both in lockstep.

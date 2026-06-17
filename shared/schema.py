@@ -102,3 +102,48 @@ class AgentTurn(BaseModel):
     distribution: NodeDistribution = Field(default_factory=NodeDistribution)
     shuffle: float = 0.0               # neutral remainder; sum(distribution.weights) + shuffle == 1
     trajectory: Trajectory | None = None
+
+
+# --- playback flow: split seam (instant first audio, then the journey) ---------
+# The flow (see docs/FRONTEND_HANDOFF.md): /entry gives the mood read + a list of
+# entry candidates → the player starts candidate[0] immediately and lets the user
+# skip; /journey builds the playlist for a chosen shape (queued behind the entry
+# track); /refill tops the candidate queue up. known_new = fraction of NEW
+# (discovery) tracks vs KNOWN (the user's go-to); the engine floors it at ~0.15.
+
+class EntryRequest(BaseModel):
+    message: str | None = None
+    session_id: str | None = None
+    seed_mood: MacroNode | None = None        # click-a-node shortcut
+    n: int = 6                                 # how many entry candidates
+    known_new: float | None = None            # % new (discovery); None → default
+
+
+class EntryResponse(BaseModel):
+    """Mood read + a skippable list of entry candidates (none chosen yet)."""
+
+    confidence: float = 0.0
+    distribution: NodeDistribution = Field(default_factory=NodeDistribution)
+    shuffle: float = 0.0
+    entry_candidates: list[TrackCandidate] = Field(default_factory=list)
+
+
+class JourneyRequest(BaseModel):
+    """Build the playlist for a chosen shape, from the entry mood/track outward."""
+
+    seed_mood: MacroNode
+    shape: TrajectoryShape
+    end_mood: MacroNode | None = None
+    exclude_isrcs: list[str] = Field(default_factory=list)   # already played (entry/skips)
+    known_new: float | None = None
+    session_id: str | None = None
+
+
+class RefillRequest(BaseModel):
+    """More candidates seeded on the centroid of what's left in the queue."""
+
+    remaining: list[TrackCandidate] = Field(default_factory=list)
+    exclude_isrcs: list[str] = Field(default_factory=list)
+    n: int = 6
+    known_new: float | None = None
+    session_id: str | None = None

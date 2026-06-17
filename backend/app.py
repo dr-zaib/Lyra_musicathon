@@ -28,12 +28,17 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from schema import (  # noqa: E402
     AgentTurn,
     AgentTurnRequest,
+    EntryRequest,
+    EntryResponse,
+    JourneyRequest,
     NodeDistribution,
+    RefillRequest,
+    TrackCandidate,
     Trajectory,
 )
 
 # SWAP DONE: real engine (engine/) via the bridge, instead of mock_engine
-from engine_bridge import build_trajectory, warm  # noqa: E402
+from engine_bridge import build_trajectory, entry_candidates, refill_candidates, warm  # noqa: E402
 import agent  # noqa: E402  (real datapizza+Claude agent: interpret + narrate)
 
 app = FastAPI(title="Lyra backend")
@@ -109,3 +114,43 @@ def turn(req: AgentTurnRequest) -> AgentTurn:
         shuffle=shuffle,
         trajectory=trajectory,
     )
+
+
+# ---- playback flow: split seam (instant first audio, then the journey) --------
+@app.post("/entry", response_model=EntryResponse)
+def entry(req: EntryRequest) -> EntryResponse:
+    """Read the mood and return a skippable list of entry candidates. The player
+    starts candidate[0] immediately; the journey is built later via /journey."""
+    if req.seed_mood:
+        distribution, shuffle, confidence = {req.seed_mood: 1.0}, 0.0, 1.0
+    else:
+        intent = agent.interpret(req.message or "")
+        distribution = intent["distribution"]
+        shuffle, confidence = intent["shuffle"], intent["confidence"]
+
+    cands = entry_candidates(distribution=distribution, n=req.n, known_new=req.known_new)
+    return EntryResponse(
+        confidence=confidence,
+        distribution=NodeDistribution(weights=distribution),
+        shuffle=shuffle,
+        entry_candidates=[TrackCandidate(**c) for c in cands],
+    )
+
+
+@app.post("/journey", response_model=Trajectory)
+def journey(req: JourneyRequest) -> Trajectory:
+    """Build the playlist for the chosen shape, excluding what already played
+    (entry track + skips). Queue it behind the entry track on the player."""
+    traj = Trajectory(**build_trajectory(
+        req.seed_mood, req.shape, n_steps=N_STEPS,
+        end_node=req.end_mood, exclude_isrcs=req.exclude_isrcs))
+    return agent.narrate(traj)
+
+
+@app.post("/refill", response_model=list[TrackCandidate])
+def refill(req: RefillRequest) -> list[TrackCandidate]:
+    """More candidates seeded on the centroid of what's left in the queue."""
+    remaining = [c.model_dump() for c in req.remaining]
+    cands = refill_candidates(remaining, exclude_isrcs=req.exclude_isrcs,
+                              n=req.n, known_new=req.known_new)
+    return [TrackCandidate(**c) for c in cands]
