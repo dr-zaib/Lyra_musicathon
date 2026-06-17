@@ -87,6 +87,9 @@ export default function ConversationPanel({
   onEscalate: () => void;
 }) {
   const floating = variant === "floating";
+  // cold start: nothing typed yet → show the value-prop hero instead of the lone seed
+  // bubble, so a first-timer (or a judge) gets it in one glance. Yields the moment you act.
+  const cold = !playing && messages.length <= 1;
 
   const agentBubble = floating
     ? "bg-white/[0.07] border border-white/10 text-fg/90 backdrop-blur-sm"
@@ -98,20 +101,33 @@ export default function ConversationPanel({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.map((m, i) =>
-          m.text.trim() ? (
-            <div
-              key={i}
-              className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                m.role === "agent" ? agentBubble : userBubble
-              }`}
-            >
-              {m.text}
-            </div>
-          ) : null,
-        )}
+        {cold ? (
+          <div className="flex h-full flex-col items-center justify-center px-2 text-center">
+            <h1 className="font-display text-[1.75rem] font-medium lowercase leading-[1.15] tracking-tight text-fg">
+              tell lyra your mood,<br />get a playlist.
+            </h1>
+            <p className="mt-3 max-w-[18rem] text-sm text-muted">
+              built from the lyrics — songs that say what you feel, not just the genre.
+            </p>
+          </div>
+        ) : (
+          <>
+            {messages.map((m, i) =>
+              m.text.trim() ? (
+                <div
+                  key={i}
+                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                    m.role === "agent" ? agentBubble : userBubble
+                  }`}
+                >
+                  {m.text}
+                </div>
+              ) : null,
+            )}
 
-        {pending && <ThinkingIndicator floating={floating} />}
+            {pending && <ThinkingIndicator floating={floating} />}
+          </>
+        )}
       </div>
 
       <div className={`px-4 pt-3 ${floating ? "" : "border-t border-border"}`}>
