@@ -70,6 +70,12 @@ def _get(method: str, **params):
                 time.sleep(wait)
                 continue
             raise
+        except (urllib.error.URLError, TimeoutError) as exc:  # transient network/SSL
+            if attempt < MAX_RETRIES - 1:
+                log.warning("Network error on %s (%s) — retry.", method, exc)
+                time.sleep(2 ** (attempt + 1))
+                continue
+            raise MusixmatchError(method, "network", str(exc))
     header = (payload or {}).get("message", {}).get("header", {})
     status = header.get("status_code")
     if status != 200:
@@ -99,6 +105,12 @@ def _post(method: str, data: dict, **query):
                 time.sleep(wait)
                 continue
             raise
+        except (urllib.error.URLError, TimeoutError) as exc:  # transient network/SSL
+            if attempt < MAX_RETRIES - 1:
+                log.warning("Network error on %s (%s) — retry.", method, exc)
+                time.sleep(2 ** (attempt + 1))
+                continue
+            raise MusixmatchError(method, "network", str(exc))
         header = payload.get("message", {}).get("header", {})
         status = header.get("status_code")
         # Musixmatch sometimes wraps a transient failure in a 200 envelope + 5xx code

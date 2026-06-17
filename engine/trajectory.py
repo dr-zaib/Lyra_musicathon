@@ -186,7 +186,8 @@ def _verse_timestamp(commontrack_id, verse: str | None) -> float | None:
     v = verse.lower().strip()
     try:
         lines = mxm.richsync_lines(commontrack_id)
-    except mxm.MusixmatchError:
+    except Exception as exc:  # richsync is optional — never break the journey
+        log.warning("richsync lookup failed (%s) — no timestamp.", exc)
         return None
     for ln in lines:
         x = (ln.get("text") or "").lower().strip()
