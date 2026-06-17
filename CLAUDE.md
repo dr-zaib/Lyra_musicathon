@@ -52,6 +52,7 @@ packages is locked in `uv.lock`; `requirements.txt` is an exported pinned fallba
 
 ## Docs
 - `docs/HOW_IT_WORKS.md` — end-to-end walkthrough (engine + agent, the live turn, the richsync/listening model).
+- `docs/FRONTEND_HANDOFF.md` — **Alberto's task list** to wire the frontend to the real backend without breakage (P0 timeout+`BACKEND_URL`, P1 shuffle/single-shot alignment, P2 verse+voice, P3 redirect).
 - `engine/README.md` — engine modules, setup, backend wire.
 
 ## The contract
