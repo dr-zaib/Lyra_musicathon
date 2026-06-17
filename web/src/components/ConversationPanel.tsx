@@ -7,8 +7,6 @@
 
 import { useEffect, useState } from "react";
 
-import type { Trajectory } from "@/lib/types";
-
 export type Msg = { role: "agent" | "user"; text: string };
 
 // While a turn is in flight (~14s on the real backend) Lyra "thinks" — dots + a
@@ -44,12 +42,12 @@ export default function ConversationPanel({
   variant,
   messages,
   comprehension,
-  canStart,
-  trajectory,
+  playing,
   pending,
   draft,
   setDraft,
   onSubmit,
+  onSurprise,
   onDeepen,
   onEvolve,
   onEscalate,
@@ -57,12 +55,12 @@ export default function ConversationPanel({
   variant: "panel" | "floating";
   messages: Msg[];
   comprehension: number;
-  canStart: boolean;
-  trajectory: Trajectory | null;
+  playing: boolean;
   pending: boolean;
   draft: string;
   setDraft: (s: string) => void;
   onSubmit: () => void;
+  onSurprise: () => void;
   onDeepen: () => void;
   onEvolve: () => void;
   onEscalate: () => void;
@@ -111,25 +109,16 @@ export default function ConversationPanel({
           <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.round(comprehension * 100)}%` }} />
         </div>
 
-        {!trajectory ? (
-          // before the journey: one clear way to proceed. (At 100% it auto-starts.)
-          <div className="mt-3 flex flex-col gap-2">
-            <button
-              onClick={onDeepen}
-              disabled={!canStart}
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-medium text-bg transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-bg-elev-2 disabled:text-muted-2"
-            >
-              <span aria-hidden>▶</span> play my journey
-            </button>
-            <button
-              onClick={onEvolve}
-              className="text-center text-xs text-muted transition hover:text-fg"
-            >
-              i can&apos;t describe my mood
-            </button>
-          </div>
+        {!playing ? (
+          // before playback: the composer is the trigger; a quiet "surprise me" too
+          <button
+            onClick={onSurprise}
+            className="mt-3 text-center text-xs text-muted transition hover:text-fg"
+          >
+            i can&apos;t describe my mood — surprise me
+          </button>
         ) : (
-          // mid-journey: reshape it — the three trajectory shapes
+          // playing: reshape the journey — the three trajectory shapes
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               onClick={onDeepen}
