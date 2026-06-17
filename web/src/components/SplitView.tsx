@@ -76,6 +76,8 @@ export default function SplitView() {
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [building, setBuilding] = useState(false); // a shape→journey is generating
+  const [showSkipHint, setShowSkipHint] = useState(false); // one-time "swipe to skip" teach
+  const skipHintDone = useRef(false);
 
   // playback queue
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -174,11 +176,16 @@ export default function SplitView() {
     const first = await enrichTrack(cands[0]);
     setQueue([{ track: first, verse: null, reason: null }]);
     setIndex(0); setPending(false);
+    // teach the swipe-to-skip gesture once, when the first track starts (scroll mode)
+    if (settings.skipMode === "scroll" && !skipHintDone.current) {
+      skipHintDone.current = true; setShowSkipHint(true);
+      setTimeout(() => setShowSkipHint(false), 4500);
+    }
     // enrich the rest behind the scenes
     Promise.all(cands.slice(1).map(enrichTrack)).then((rest) =>
       setQueue((q) => [...q, ...rest.map((t) => ({ track: t, verse: null, reason: null }))]),
     );
-  }, [settings.knownNew, settings.language]);
+  }, [settings.knownNew, settings.language, settings.skipMode]);
 
   const refill = useCallback(async () => {
     try {
@@ -234,13 +241,14 @@ export default function SplitView() {
   }, [seed, index, queue, settings.knownNew, settings.language]);
 
   const next = useCallback(() => {
+    setShowSkipHint(false);
     setIndex((i) => {
       const ni = Math.min(queue.length - 1, i + 1);
       if (!shapeChosen && queue.length - ni <= 2) refill();
       return ni;
     });
   }, [queue.length, shapeChosen, refill]);
-  const prev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
+  const prev = useCallback(() => { setShowSkipHint(false); setIndex((i) => Math.max(0, i - 1)); }, []);
 
   const toggle = () => {
     const a = audioRef.current; if (!a) return;
@@ -261,9 +269,9 @@ export default function SplitView() {
   const reset = useCallback(() => {
     const a = audioRef.current; if (a) { a.pause(); a.removeAttribute("src"); }
     sessionId.current = crypto.randomUUID();
-    playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null;
+    playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     setMessages([{ role: "agent", text: "describe how you feel — in your words." }]);
-    setComprehension(0); setDistribution(undefined); setPending(false); setBuilding(false);
+    setComprehension(0); setDistribution(undefined); setPending(false); setBuilding(false); setShowSkipHint(false);
     setQueue([]); setIndex(0); setShapeChosen(false); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
@@ -299,6 +307,7 @@ export default function SplitView() {
   const convoProps = {
     messages, comprehension, playing, pending, building, hasSignal,
     draft, setDraft, onSubmit: submit,
+    onExample: (text: string) => composeMood({ message: text }),
     onCreate: () => startEntry(),
     onSurprise: () => startEntry(),
     onDeepen: () => chooseShape("deepen"),
@@ -315,14 +324,20 @@ export default function SplitView() {
     />
   ) : null;
 
+  const iconBtn = "flex h-10 w-10 items-center justify-center rounded-full text-muted transition hover:bg-bg-elev hover:text-fg";
   const controls = (canReset: boolean) => (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center">
       {playing && (
-        <button onClick={() => setPlaylistOpen(true)} aria-label="view playlist" title="view playlist" className="text-base text-muted-2 transition hover:text-fg">☰</button>
+        <button onClick={() => setPlaylistOpen(true)} aria-label="view playlist" title="view playlist" className={iconBtn}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <line x1="4" y1="7" x2="15" y2="7" /><line x1="4" y1="12" x2="15" y2="12" /><line x1="4" y1="17" x2="11" y2="17" />
+            <circle cx="18" cy="16" r="2.5" /><line x1="20.5" y1="16" x2="20.5" y2="8.5" /><path d="M20.5 8.5 L16.5 9.7" />
+          </svg>
+        </button>
       )}
-      <button onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings" className="text-base text-muted-2 transition hover:text-fg">⚙</button>
+      <button onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings" className={`${iconBtn} text-lg`}>⚙</button>
       {canReset && (
-        <button onClick={reset} aria-label="start over" title="start over" className="text-base text-muted-2 transition hover:text-fg">↺</button>
+        <button onClick={reset} aria-label="start over" title="start over" className={`${iconBtn} text-lg`}>↺</button>
       )}
     </div>
   );
@@ -365,6 +380,13 @@ export default function SplitView() {
           </div>
         </div>
 
+        {showSkipHint && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center">
+            <span className="animate-fade-up rounded-full border border-white/10 bg-bg-elev/80 px-3 py-1.5 text-[11px] text-muted backdrop-blur-sm">
+              swipe up for the next ↑
+            </span>
+          </div>
+        )}
         {player && <div className="relative z-20 shrink-0">{player}</div>}
       </div>
 

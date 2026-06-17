@@ -9,6 +9,19 @@ import { useEffect, useState } from "react";
 
 export type Msg = { role: "agent" | "user"; text: string };
 
+// Cold-start seeds — show the user the *kind* of thing to type (a feeling, not a genre).
+// Chosen to read clearly on the mood map (restless→anxiety, missing→nostalgia, hopeful→hope).
+const EXAMPLES = ["restless and wired", "missing someone", "quietly hopeful"];
+
+// Lyra's read, as a word instead of a bare % (a low number shouldn't read as "failing").
+function readLabel(c: number): string {
+  if (c <= 0) return "listening";
+  if (c < 0.34) return "tuning in";
+  if (c < 0.7) return "getting it";
+  if (c < 1) return "almost there";
+  return "got it";
+}
+
 // While a turn is in flight (~14s on the real backend) Lyra "thinks" — dots + a
 // rotating status line so the wait never looks stuck.
 const THINKING = ["reading the feeling…", "walking the catalog…", "citing the line…"];
@@ -19,7 +32,7 @@ function ThinkingIndicator({ floating }: { floating: boolean }) {
     return () => clearInterval(id);
   }, []);
   const bubble = floating
-    ? "border border-white/10 bg-white/[0.04]"
+    ? "border border-white/10 bg-white/[0.07] backdrop-blur-sm"
     : "bg-bg-elev/70";
   return (
     <div
@@ -49,6 +62,7 @@ export default function ConversationPanel({
   draft,
   setDraft,
   onSubmit,
+  onExample,
   onCreate,
   onSurprise,
   onDeepen,
@@ -65,6 +79,7 @@ export default function ConversationPanel({
   draft: string;
   setDraft: (s: string) => void;
   onSubmit: () => void;
+  onExample: (text: string) => void;
   onCreate: () => void;
   onSurprise: () => void;
   onDeepen: () => void;
@@ -74,10 +89,10 @@ export default function ConversationPanel({
   const floating = variant === "floating";
 
   const agentBubble = floating
-    ? "bg-white/[0.04] border border-white/10 text-fg/90"
+    ? "bg-white/[0.07] border border-white/10 text-fg/90 backdrop-blur-sm"
     : "bg-bg-elev/70 text-fg/90";
   const userBubble = floating
-    ? "ml-auto border border-accent/25 bg-accent/10 text-fg"
+    ? "ml-auto border border-accent/25 bg-accent/15 text-fg backdrop-blur-sm"
     : "ml-auto bg-bg-elev-2 text-fg";
 
   return (
@@ -101,13 +116,13 @@ export default function ConversationPanel({
 
       <div className={`px-4 pt-3 ${floating ? "" : "border-t border-border"}`}>
         <div className="mb-1 flex justify-between text-[11px] text-muted-2">
-          <span>how well lyra understands you</span>
-          <span>{Math.round(comprehension * 100)}%</span>
+          <span>lyra’s read on you</span>
+          <span className="text-muted">{readLabel(comprehension)}</span>
         </div>
         <div
           className="h-1.5 overflow-hidden rounded-full bg-bg-elev-2"
           role="progressbar"
-          aria-label="how well lyra understands you"
+          aria-label={`lyra's read on you: ${readLabel(comprehension)}`}
           aria-valuenow={Math.round(comprehension * 100)}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -116,22 +131,34 @@ export default function ConversationPanel({
         </div>
 
         {!playing ? (
-          // before playback: describe the mood (type or click nodes), then commit.
-          // once there's signal, the explicit "create my playlist" is the trigger.
-          <div className="mt-3 flex flex-col items-center gap-1.5">
-            {hasSignal && (
+          // before playback: describe the mood (type, pick an example, or click nodes),
+          // then commit. once there's signal, "create my playlist" is the gold trigger.
+          <div className="mt-3 flex flex-col items-center gap-2">
+            {hasSignal ? (
               <button
                 onClick={onCreate}
                 className="w-full rounded-xl bg-accent px-4 py-2 text-sm font-medium text-bg transition hover:brightness-110"
               >
                 create my playlist ▶
               </button>
+            ) : (
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {EXAMPLES.map((ex) => (
+                  <button
+                    key={ex}
+                    onClick={() => onExample(ex)}
+                    className="rounded-full border border-border px-3 py-1 text-[11px] text-muted transition hover:border-accent hover:text-fg"
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
             )}
             <button
               onClick={onSurprise}
               className="text-center text-xs text-muted transition hover:text-fg"
             >
-              {hasSignal ? "or surprise me" : "i can’t describe my mood — surprise me"}
+              or surprise me
             </button>
           </div>
         ) : (
@@ -174,7 +201,7 @@ export default function ConversationPanel({
               floating ? "border-white/15 bg-white/[0.06] backdrop-blur-sm" : "border-border bg-transparent"
             }`}
           />
-          <button type="submit" className="rounded-xl bg-accent px-4 text-sm text-bg transition hover:brightness-110">
+          <button type="submit" className="rounded-xl border border-border px-4 text-sm text-muted transition hover:border-accent hover:text-fg">
             send
           </button>
         </form>

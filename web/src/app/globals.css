@@ -6,7 +6,7 @@
   --bg-elev-2: #1c1c28;
   --fg: #ece9f5;
   --muted: #8b88a0;
-  --muted-2: #5d5b70;
+  --muted-2: #7c7a90; /* ~4.6:1 on --bg → passes WCAG AA for small text (was #5d5b70, 3.0:1) */
   --accent: #e8b54a;
   --accent-soft: #e8b54a22;
   --border: #ffffff14;
