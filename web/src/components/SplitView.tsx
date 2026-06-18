@@ -53,10 +53,16 @@ function dominantOf(d?: NodeDistribution): MacroNode | null {
 
 // Optimistic nudge for a node click — gives the wheel an instant reaction while the
 // agent turn is in flight (~14s on the real backend); the server response then
-// reconciles to the authoritative distribution.
+// reconciles to the authoritative distribution. A *new* mood is slotted in BELOW the
+// existing ones (rank decay, matching the agent's "first mood strongest" rule) so the
+// spike doesn't briefly overshoot to full length and then snap shorter on reconcile.
 function optimisticNudge(prev: NodeDistribution | undefined, m: MacroNode): NodeDistribution {
   const w = { ...(prev?.weights ?? {}) };
-  w[m] = Math.min(1, (w[m] ?? 0) + (w[m] != null ? 0.15 : 0.5));
+  if (w[m] != null) { w[m] = Math.min(1, w[m] + 0.1); return { weights: w }; }
+  const vals = Object.values(w) as number[];
+  const max = vals.length ? Math.max(...vals) : 0;
+  const rank = vals.length; // 0 = first mood, 1 = second, …
+  w[m] = max > 0 ? max * Math.pow(0.62, rank) : 0.5;
   return { weights: w };
 }
 
