@@ -6,7 +6,7 @@
   --bg-elev-2: #1c1c28;
   --fg: #ece9f5;
   --muted: #8b88a0;
-  --muted-2: #5d5b70;
+  --muted-2: #7c7a90; /* ~4.6:1 on --bg → passes WCAG AA for small text (was #5d5b70, 3.0:1) */
   --accent: #e8b54a;
   --accent-soft: #e8b54a22;
   --border: #ffffff14;
@@ -123,6 +123,52 @@ body::before {
 .lyra-typing-dot:nth-child(3) {
   animation-delay: 0.3s;
 }
+
+/* range inputs: the native thumb picks up the OS accent colour (a stray red dot on
+   some Windows setups). Force our accent, then take explicit control of the thumb. */
+input[type="range"] { accent-color: var(--accent); }
+
+/* player seek: a clean line, no visible knob (click + drag still seek) */
+.lyra-seek::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 0; height: 0; }
+.lyra-seek::-moz-range-thumb { width: 0; height: 0; border: none; background: transparent; }
+
+/* settings sliders: a small gold knob */
+.lyra-knob::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -4px;
+  border-radius: 9999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--bg-elev);
+  cursor: pointer;
+}
+.lyra-knob::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+/* now-playing equalizer on the player artwork */
+@keyframes lyra-eq {
+  0%, 100% { transform: scaleY(0.28); }
+  50% { transform: scaleY(1); }
+}
+.lyra-eq-bar {
+  display: block;
+  width: 2px;
+  height: 11px;
+  background: var(--accent);
+  border-radius: 1px;
+  transform-origin: bottom;
+  animation: lyra-eq 0.9s ease-in-out infinite;
+}
+.lyra-eq-bar:nth-child(2) { animation-delay: 0.22s; }
+.lyra-eq-bar:nth-child(3) { animation-delay: 0.44s; }
 
 /* accessibility: honor reduced motion — stop the breathing wheel + snap transitions
    (the wheel's rAF tween also snaps via matchMedia in EmotionWheel) */

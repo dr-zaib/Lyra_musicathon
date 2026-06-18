@@ -9,6 +9,19 @@ import { useEffect, useState } from "react";
 
 export type Msg = { role: "agent" | "user"; text: string };
 
+// Cold-start seeds — show the user the *kind* of thing to type (a feeling, not a genre).
+// Chosen to read clearly on the mood map (restless→anxiety, missing→nostalgia, hopeful→hope).
+const EXAMPLES = ["restless and wired", "missing someone", "quietly hopeful"];
+
+// Lyra's read, as a word instead of a bare % (a low number shouldn't read as "failing").
+function readLabel(c: number): string {
+  if (c <= 0) return "listening";
+  if (c < 0.34) return "tuning in";
+  if (c < 0.7) return "getting it";
+  if (c < 1) return "almost there";
+  return "got it";
+}
+
 // While a turn is in flight (~14s on the real backend) Lyra "thinks" — dots + a
 // rotating status line so the wait never looks stuck.
 const THINKING = ["reading the feeling…", "walking the catalog…", "citing the line…"];
@@ -19,7 +32,7 @@ function ThinkingIndicator({ floating }: { floating: boolean }) {
     return () => clearInterval(id);
   }, []);
   const bubble = floating
-    ? "border border-white/10 bg-white/[0.04]"
+    ? "border border-white/10 bg-white/[0.07] backdrop-blur-sm"
     : "bg-bg-elev/70";
   return (
     <div
@@ -44,9 +57,13 @@ export default function ConversationPanel({
   comprehension,
   playing,
   pending,
+  building,
+  hasSignal,
   draft,
   setDraft,
   onSubmit,
+  onExample,
+  onCreate,
   onSurprise,
   onDeepen,
   onEvolve,
@@ -57,51 +74,71 @@ export default function ConversationPanel({
   comprehension: number;
   playing: boolean;
   pending: boolean;
+  building: boolean;
+  hasSignal: boolean;
   draft: string;
   setDraft: (s: string) => void;
   onSubmit: () => void;
+  onExample: (text: string) => void;
+  onCreate: () => void;
   onSurprise: () => void;
   onDeepen: () => void;
   onEvolve: () => void;
   onEscalate: () => void;
 }) {
   const floating = variant === "floating";
+  // cold start: nothing typed yet → show the value-prop hero instead of the lone seed
+  // bubble, so a first-timer (or a judge) gets it in one glance. Yields the moment you act.
+  const cold = !playing && messages.length <= 1;
 
   const agentBubble = floating
-    ? "bg-white/[0.04] border border-white/10 text-fg/90"
+    ? "bg-white/[0.07] border border-white/10 text-fg/90 backdrop-blur-sm"
     : "bg-bg-elev/70 text-fg/90";
   const userBubble = floating
-    ? "ml-auto border border-accent/25 bg-accent/10 text-fg"
+    ? "ml-auto border border-accent/25 bg-accent/15 text-fg backdrop-blur-sm"
     : "ml-auto bg-bg-elev-2 text-fg";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.map((m, i) =>
-          m.text.trim() ? (
-            <div
-              key={i}
-              className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                m.role === "agent" ? agentBubble : userBubble
-              }`}
-            >
-              {m.text}
-            </div>
-          ) : null,
-        )}
+        {cold ? (
+          <div className="flex h-full flex-col items-center justify-center px-2 text-center">
+            <h1 className="font-display text-[1.75rem] font-medium lowercase leading-[1.15] tracking-tight text-fg">
+              tell lyra your mood,<br />get a playlist.
+            </h1>
+            <p className="mt-3 max-w-[18rem] text-sm text-muted">
+              built from the lyrics — songs that say what you feel, not just the genre.
+            </p>
+          </div>
+        ) : (
+          <>
+            {messages.map((m, i) =>
+              m.text.trim() ? (
+                <div
+                  key={i}
+                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                    m.role === "agent" ? agentBubble : userBubble
+                  }`}
+                >
+                  {m.text}
+                </div>
+              ) : null,
+            )}
 
-        {pending && <ThinkingIndicator floating={floating} />}
+            {pending && <ThinkingIndicator floating={floating} />}
+          </>
+        )}
       </div>
 
       <div className={`px-4 pt-3 ${floating ? "" : "border-t border-border"}`}>
         <div className="mb-1 flex justify-between text-[11px] text-muted-2">
-          <span>how well lyra understands you</span>
-          <span>{Math.round(comprehension * 100)}%</span>
+          <span>lyra’s read on you</span>
+          <span className="text-muted">{readLabel(comprehension)}</span>
         </div>
         <div
           className="h-1.5 overflow-hidden rounded-full bg-bg-elev-2"
           role="progressbar"
-          aria-label="how well lyra understands you"
+          aria-label={`lyra's read on you: ${readLabel(comprehension)}`}
           aria-valuenow={Math.round(comprehension * 100)}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -110,34 +147,63 @@ export default function ConversationPanel({
         </div>
 
         {!playing ? (
-          // before playback: the composer is the trigger; a quiet "surprise me" too
-          <button
-            onClick={onSurprise}
-            className="mt-3 text-center text-xs text-muted transition hover:text-fg"
-          >
-            i can&apos;t describe my mood — surprise me
-          </button>
+          // before playback: describe the mood (type, pick an example, or click nodes),
+          // then commit. once there's signal, "create my playlist" is the gold trigger.
+          <div className="mt-3 flex flex-col items-center gap-2">
+            {hasSignal ? (
+              <button
+                onClick={onCreate}
+                className="w-full rounded-xl bg-accent px-4 py-2 text-sm font-medium text-bg transition hover:brightness-110"
+              >
+                create my playlist ▶
+              </button>
+            ) : (
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {EXAMPLES.map((ex) => (
+                  <button
+                    key={ex}
+                    onClick={() => onExample(ex)}
+                    className="rounded-full border border-border px-3 py-1 text-[11px] text-muted transition hover:border-accent hover:text-fg"
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={onSurprise}
+              className="text-center text-xs text-muted transition hover:text-fg"
+            >
+              or surprise me
+            </button>
+          </div>
         ) : (
-          // playing: reshape the journey — the three trajectory shapes
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              onClick={onDeepen}
-              className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
-            >
-              go deeper
-            </button>
-            <button
-              onClick={onEvolve}
-              className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
-            >
-              take me somewhere new
-            </button>
-            <button
-              onClick={onEscalate}
-              className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
-            >
-              turn it up
-            </button>
+          // playing: steer where the playlist goes next — the three trajectory shapes
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted-2">
+              <span>your playlist — where to next?</span>
+              {building && <span className="text-muted">extending your playlist…</span>}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={onDeepen}
+                className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
+              >
+                more like this
+              </button>
+              <button
+                onClick={onEvolve}
+                className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
+              >
+                change the mood
+              </button>
+              <button
+                onClick={onEscalate}
+                className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
+              >
+                raise the energy
+              </button>
+            </div>
           </div>
         )}
 
@@ -151,7 +217,7 @@ export default function ConversationPanel({
               floating ? "border-white/15 bg-white/[0.06] backdrop-blur-sm" : "border-border bg-transparent"
             }`}
           />
-          <button type="submit" className="rounded-xl bg-accent px-4 text-sm text-bg transition hover:brightness-110">
+          <button type="submit" className="rounded-xl border border-border px-4 text-sm text-muted transition hover:border-accent hover:text-fg">
             send
           </button>
         </form>

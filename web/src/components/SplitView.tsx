@@ -15,8 +15,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ConversationPanel, { type Msg } from "./ConversationPanel";
 import EmotionWheel from "./EmotionWheel";
 import PlayerBar from "./PlayerBar";
-import Settings, { type PlaybackSettings } from "./Settings";
+import PlaylistView from "./PlaylistView";
+import Settings, { type PlaybackSettings, defaultLanguage } from "./Settings";
 import type {
+  AgentTurn,
   EntryResponse,
   JourneyRequest,
   MacroNode,
@@ -49,10 +51,26 @@ function dominantOf(d?: NodeDistribution): MacroNode | null {
   return best;
 }
 
+// Optimistic nudge for a node click — gives the wheel an instant reaction while the
+// agent turn is in flight (~14s on the real backend); the server response then
+// reconciles to the authoritative distribution. A *new* mood is slotted in BELOW the
+// existing ones (rank decay, matching the agent's "first mood strongest" rule) so the
+// spike doesn't briefly overshoot to full length and then snap shorter on reconcile.
+function optimisticNudge(prev: NodeDistribution | undefined, m: MacroNode): NodeDistribution {
+  const w = { ...(prev?.weights ?? {}) };
+  if (w[m] != null) { w[m] = Math.min(1, w[m] + 0.1); return { weights: w }; }
+  const vals = Object.values(w) as number[];
+  const max = vals.length ? Math.max(...vals) : 0;
+  const rank = vals.length; // 0 = first mood, 1 = second, …
+  w[m] = max > 0 ? max * Math.pow(0.62, rank) : 0.5;
+  return { weights: w };
+}
+
 export default function SplitView() {
   const sessionId = useRef<string>(crypto.randomUUID());
-  const [settings, setSettings] = useState<PlaybackSettings>({ knownNew: 0.5, skipMode: "scroll" });
+  const [settings, setSettings] = useState<PlaybackSettings>(() => ({ knownNew: 0.5, skipMode: "scroll", language: defaultLanguage() }));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [playlistOpen, setPlaylistOpen] = useState(false);
 
   // intent → wheel
   const [distribution, setDistribution] = useState<NodeDistribution | undefined>(undefined);
@@ -60,9 +78,12 @@ export default function SplitView() {
   const seed = useMemo(() => dominantOf(distribution), [distribution]);
 
   // narration feed + composer
-  const [messages, setMessages] = useState<Msg[]>([{ role: "agent", text: "describe your mood — in your own words." }]);
+  const [messages, setMessages] = useState<Msg[]>([{ role: "agent", text: "describe how you feel — in your words." }]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
+  const [building, setBuilding] = useState(false); // a shape→journey is generating
+  const [showSkipHint, setShowSkipHint] = useState(false); // one-time "swipe to skip" teach
+  const skipHintDone = useRef(false);
 
   // playback queue
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -102,7 +123,41 @@ export default function SplitView() {
   }, [index, queue]); // eslint-disable-line react-hooks/exhaustive-deps
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // feeling in → entry track plays immediately
+  // describe the mood (type a line or click a node) → reads intent, shapes the wheel,
+  // raises the comprehension bar. NO playback — this composes the request. Repeatable.
+  const composeMood = useCallback(async (opts: { message?: string; seed_mood?: MacroNode }) => {
+    const { message, seed_mood } = opts;
+    if (!message && !seed_mood) return;
+    setPending(true);
+    if (message) setMessages((m) => [...m, { role: "user", text: message }]);
+    if (seed_mood) {
+      // instant optimistic feedback on a click; reconciled by the agent response
+      setMessages((m) => [...m, { role: "user", text: `→ ${seed_mood.toLowerCase()}` }]);
+      setDistribution((prev) => optimisticNudge(prev, seed_mood));
+      setComprehension((c) => Math.min(1, c + 0.15));
+    }
+    let turn: AgentTurn;
+    try {
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message, seed_mood, session_id: sessionId.current, language: settings.language }),
+      });
+      if (!res.ok) throw new Error(`agent ${res.status}`);
+      turn = await res.json();
+    } catch {
+      setPending(false);
+      setMessages((m) => [...m, { role: "agent", text: "i lost you for a second — say that again?" }]);
+      return;
+    }
+    setComprehension(turn.confidence);
+    setDistribution(turn.distribution);
+    // show the agent's line for typed turns; a click already spoke via its user bubble
+    if (turn.message?.trim() && !seed_mood) setMessages((m) => [...m, { role: "agent", text: turn.message }]);
+    setPending(false);
+  }, [settings.language]);
+
+  // commit the composed mood → entry track plays immediately (journey hides behind it)
   const startEntry = useCallback(async (message?: string) => {
     setPending(true); setShapeChosen(false); autoGenFired.current = false; shownReason.current = null;
     if (message) setMessages((m) => [...m, { role: "user", text: message }]);
@@ -111,7 +166,7 @@ export default function SplitView() {
       const res = await fetch("/api/entry", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message, session_id: sessionId.current, known_new: settings.knownNew }),
+        body: JSON.stringify({ message, session_id: sessionId.current, known_new: settings.knownNew, language: settings.language }),
       });
       if (!res.ok) throw new Error(`entry ${res.status}`);
       data = await res.json();
@@ -127,11 +182,16 @@ export default function SplitView() {
     const first = await enrichTrack(cands[0]);
     setQueue([{ track: first, verse: null, reason: null }]);
     setIndex(0); setPending(false);
+    // teach the swipe-to-skip gesture once, when the first track starts (scroll mode)
+    if (settings.skipMode === "scroll" && !skipHintDone.current) {
+      skipHintDone.current = true; setShowSkipHint(true);
+      setTimeout(() => setShowSkipHint(false), 4500);
+    }
     // enrich the rest behind the scenes
     Promise.all(cands.slice(1).map(enrichTrack)).then((rest) =>
       setQueue((q) => [...q, ...rest.map((t) => ({ track: t, verse: null, reason: null }))]),
     );
-  }, [settings.knownNew]);
+  }, [settings.knownNew, settings.language, settings.skipMode]);
 
   const refill = useCallback(async () => {
     try {
@@ -139,7 +199,7 @@ export default function SplitView() {
       const res = await fetch("/api/refill", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ remaining, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, session_id: sessionId.current }),
+        body: JSON.stringify({ remaining, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current }),
       });
       const more: TrackCandidate[] = await res.json();
       const enriched = await Promise.all(more.map(enrichTrack));
@@ -147,15 +207,18 @@ export default function SplitView() {
     } catch {
       // best-effort
     }
-  }, [queue, index, settings.knownNew]);
+  }, [queue, index, settings.knownNew, settings.language]);
 
-  // pick a shape → journey queued behind the current track (entry track = its head)
-  const chooseShape = useCallback(async (shape: TrajectoryShape) => {
+  // pick a shape → journey queued behind the current track (entry track = its head).
+  // Progressive: the first step lands as soon as it's enriched (kills the freeze), the
+  // rest stream in behind it. `silent` skips the "extending…" indicator (auto-gen).
+  const chooseShape = useCallback(async (shape: TrajectoryShape, silent = false) => {
     if (!seed) return;
     setShapeChosen(true);
+    if (!silent) setBuilding(true);
     let traj: Trajectory;
     try {
-      const body: JourneyRequest = { seed_mood: seed, shape, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, session_id: sessionId.current };
+      const body: JourneyRequest = { seed_mood: seed, shape, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current };
       const res = await fetch("/api/journey", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -164,26 +227,34 @@ export default function SplitView() {
       if (!res.ok) throw new Error(`journey ${res.status}`);
       traj = await res.json();
     } catch {
+      setBuilding(false);
       return;
     }
-    const items: QueueItem[] = await Promise.all(
-      traj.steps.map(async (s) => ({ track: await enrichTrack(s.selected_track), verse: s.citable_verse ?? null, reason: s.transition_reason ?? null })),
-    );
-    setQueue((q) => {
-      const head = q.slice(0, index + 1);
-      const curId = q[index]?.track.track_id;
-      return [...head, ...items.filter((it) => it.track.track_id !== curId)];
-    });
-  }, [seed, index, settings.knownNew]);
+    const at = index;
+    const curId = queue[at]?.track.track_id;
+    const steps = traj.steps.filter((s) => s.selected_track.track_id !== curId);
+    if (!steps.length) { setBuilding(false); return; }
+    // first step appended immediately, rest behind the scenes
+    const first = steps[0];
+    const firstItem: QueueItem = { track: await enrichTrack(first.selected_track), verse: first.citable_verse ?? null, reason: first.transition_reason ?? null };
+    setQueue((q) => [...q.slice(0, at + 1), firstItem]);
+    setBuilding(false);
+    if (steps.length > 1) {
+      Promise.all(
+        steps.slice(1).map(async (s) => ({ track: await enrichTrack(s.selected_track), verse: s.citable_verse ?? null, reason: s.transition_reason ?? null })),
+      ).then((rest) => setQueue((q) => [...q, ...rest]));
+    }
+  }, [seed, index, queue, settings.knownNew, settings.language]);
 
   const next = useCallback(() => {
+    setShowSkipHint(false);
     setIndex((i) => {
       const ni = Math.min(queue.length - 1, i + 1);
       if (!shapeChosen && queue.length - ni <= 2) refill();
       return ni;
     });
   }, [queue.length, shapeChosen, refill]);
-  const prev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
+  const prev = useCallback(() => { setShowSkipHint(false); setIndex((i) => Math.max(0, i - 1)); }, []);
 
   const toggle = () => {
     const a = audioRef.current; if (!a) return;
@@ -197,17 +268,17 @@ export default function SplitView() {
     // hide the ~14s: if no shape chosen, auto-generate before the entry track ends
     if (!shapeChosen && !autoGenFired.current && playing && duration > 0 && duration - t <= 8) {
       autoGenFired.current = true;
-      chooseShape("deepen");
+      chooseShape("deepen", true); // silent: hide the journey gen behind the entry track
     }
   };
 
   const reset = useCallback(() => {
     const a = audioRef.current; if (a) { a.pause(); a.removeAttribute("src"); }
     sessionId.current = crypto.randomUUID();
-    playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null;
-    setMessages([{ role: "agent", text: "describe your mood — in your own words." }]);
-    setComprehension(0); setDistribution(undefined); setPending(false);
-    setQueue([]); setIndex(0); setShapeChosen(false);
+    playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
+    setMessages([{ role: "agent", text: "describe how you feel — in your words." }]);
+    setComprehension(0); setDistribution(undefined); setPending(false); setBuilding(false); setShowSkipHint(false);
+    setQueue([]); setIndex(0); setShapeChosen(false); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
 
@@ -232,12 +303,18 @@ export default function SplitView() {
     const text = draft.trim();
     if (!text) return;
     setDraft("");
-    startEntry(text);
-  }, [draft, startEntry]);
+    // before playback: typing composes the mood; during playback: a quick "more like
+    // this" steer phrased in the user's words.
+    if (queue.length > 0) startEntry(text); else composeMood({ message: text });
+  }, [draft, queue.length, startEntry, composeMood]);
+
+  const hasSignal = comprehension > 0 || (!!distribution && Object.keys(distribution.weights).length > 0);
 
   const convoProps = {
-    messages, comprehension, playing, pending,
+    messages, comprehension, playing, pending, building, hasSignal,
     draft, setDraft, onSubmit: submit,
+    onExample: (text: string) => composeMood({ message: text }),
+    onCreate: () => startEntry(),
     onSurprise: () => startEntry(),
     onDeepen: () => chooseShape("deepen"),
     onEvolve: () => chooseShape("evolve"),
@@ -250,14 +327,16 @@ export default function SplitView() {
       isPlaying={isPlaying} currentTime={currentTime} duration={duration}
       hasPrev={index > 0} hasNext={index < queue.length - 1}
       onToggle={toggle} onPrev={prev} onNext={next} onSeek={seek}
+      onOpenPlaylist={() => setPlaylistOpen(true)}
     />
   ) : null;
 
+  const iconBtn = "flex h-10 w-10 items-center justify-center rounded-full text-muted transition hover:bg-bg-elev hover:text-fg";
   const controls = (canReset: boolean) => (
-    <div className="flex items-center gap-1">
-      <button onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings" className="text-base text-muted-2 transition hover:text-fg">⚙</button>
+    <div className="flex items-center">
+      <button onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings" className={`${iconBtn} text-lg`}>⚙</button>
       {canReset && (
-        <button onClick={reset} aria-label="start over" title="start over" className="text-base text-muted-2 transition hover:text-fg">↺</button>
+        <button onClick={reset} aria-label="start over" title="start over" className={`${iconBtn} text-lg`}>↺</button>
       )}
     </div>
   );
@@ -272,6 +351,9 @@ export default function SplitView() {
       />
 
       {settingsOpen && <Settings settings={settings} setSettings={setSettings} onClose={() => setSettingsOpen(false)} />}
+      {playlistOpen && playing && (
+        <PlaylistView items={queue} index={index} onJump={(i) => { setIndex(i); setPlaylistOpen(false); }} onClose={() => setPlaylistOpen(false)} />
+      )}
 
       {/* ===== MOBILE ===== */}
       <div className="relative flex h-screen flex-col overflow-hidden md:hidden">
@@ -288,15 +370,24 @@ export default function SplitView() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-bg via-bg/85 to-transparent" />
 
         <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-          <div className="flex items-baseline gap-2 px-4 pt-4">
-            <span className="font-display text-xl font-medium lowercase tracking-tight">lyra</span>
-            <span className="text-[11px] text-muted-2">the lyrics layer for your player</span>
+          <div className="px-4 pt-4">
+            <div className="font-display text-2xl font-medium lowercase leading-none tracking-tight">
+              lyra<span className="text-accent">.</span>
+            </div>
+            <div className="mt-1 text-[11px] text-muted">the lyrics layer for your player</div>
           </div>
           <div className="min-h-0 flex-1">
             <ConversationPanel variant="floating" {...convoProps} />
           </div>
         </div>
 
+        {showSkipHint && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center">
+            <span className="animate-fade-up rounded-full border border-white/10 bg-bg-elev/80 px-3 py-1.5 text-[11px] text-muted backdrop-blur-sm">
+              swipe up for the next ↑
+            </span>
+          </div>
+        )}
         {player && <div className="relative z-20 shrink-0">{player}</div>}
       </div>
 
@@ -305,12 +396,12 @@ export default function SplitView() {
         <main className="mx-auto flex w-full max-w-6xl flex-1 gap-6 overflow-hidden px-6 py-5">
           <section className="flex w-1/2 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="mb-2 flex items-baseline gap-3">
-              <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra</span>
-              <span className="text-xs text-muted-2">the lyrics layer for your player</span>
+              <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
+              <span className="text-xs text-muted">the lyrics layer for your player</span>
               <div className="ml-auto">{controls(playing || comprehension > 0)}</div>
             </div>
             <div className="flex-1">
-              <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape onSelect={(m) => startEntry(`take me toward ${m.toLowerCase()}`)} />
+              <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape onSelect={(m) => composeMood({ seed_mood: m })} />
             </div>
           </section>
           <section className="flex w-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
