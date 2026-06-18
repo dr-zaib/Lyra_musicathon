@@ -98,7 +98,7 @@ export default function SplitView() {
   const modeRef = useRef<TrajectoryShape>("deepen");
 
   // narration feed + composer
-  const [messages, setMessages] = useState<Msg[]>([{ role: "agent", text: "describe how you feel — in your words." }]);
+  const [messages, setMessages] = useState<Msg[]>([]); // empty: the cold hero is the prompt, the feed fills with real turns
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [building, setBuilding] = useState(false); // a journey is (re)generating
@@ -316,7 +316,7 @@ export default function SplitView() {
     sessionId.current = crypto.randomUUID();
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     picksRef.current = []; modeRef.current = "deepen";
-    setMessages([{ role: "agent", text: "describe how you feel — in your words." }]);
+    setMessages([]);
     setPicks([]); setMode("deepen"); setPending(false); setBuilding(false); setShowSkipHint(false);
     setQueue([]); setIndex(0); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");

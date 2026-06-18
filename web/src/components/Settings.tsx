@@ -83,26 +83,10 @@ export default function Settings({
           </p>
         </div>
 
-        {/* lyrics language */}
-        <div className="mt-5">
-          <div className="mb-2 text-xs text-muted">lyrics language</div>
-          <div className="flex flex-wrap gap-2">
-            {LANGS.map((l) => (
-              <button
-                key={l.code}
-                onClick={() => setSettings({ ...settings, language: l.code })}
-                className={`rounded-xl border px-3 py-1.5 text-xs transition ${
-                  settings.language === l.code
-                    ? "border-accent bg-accent/10 text-fg"
-                    : "border-border text-muted hover:text-fg"
-                }`}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
-          <p className="mt-1 text-[11px] text-muted-2">which language Lyra picks lyrics in — defaults to your browser&apos;s.</p>
-        </div>
+        {/* lyrics language — hidden for the demo: the engine stays "en" on purpose
+            (Axel's call), so a language picker here would be a no-op control. The
+            `language` field still ships in requests (ignored) and `defaultLanguage()`
+            still seeds it, so re-adding this block is the only step to restore it. */}
       </div>
     </div>
   );

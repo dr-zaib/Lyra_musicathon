@@ -77,7 +77,7 @@ export default function ConversationPanel({
   canReset: boolean;
 }) {
   const floating = variant === "floating";
-  const cold = !playing && messages.length <= 1;
+  const cold = !playing && messages.length === 0;
 
   const agentBubble = floating ? "bg-white/[0.07] border border-white/10 text-fg/90 backdrop-blur-sm" : "bg-bg-elev/70 text-fg/90";
   const userBubble = floating ? "ml-auto border border-accent/25 bg-accent/15 text-fg backdrop-blur-sm" : "ml-auto bg-bg-elev-2 text-fg";
