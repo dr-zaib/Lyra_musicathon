@@ -53,12 +53,13 @@ function dominantOf(d?: NodeDistribution): MacroNode | null {
   return best;
 }
 
-// The wheel shape = frequency of each mood in the picks buffer (double-press → 2×).
+// The wheel shape weights each pick by its position in the buffer (oldest/first = the
+// strongest: 1, 0.62, 0.38…), so the order you pick reads as a hierarchy — the first
+// mood's spike is the longest. A repeated mood stacks (double-press → bigger spike).
 function freqDistribution(picks: MacroNode[]): NodeDistribution | undefined {
   if (!picks.length) return undefined;
   const w: Partial<Record<MacroNode, number>> = {};
-  for (const m of picks) w[m] = (w[m] ?? 0) + 1;
-  for (const k of Object.keys(w) as MacroNode[]) w[k] = (w[k] as number) / picks.length;
+  picks.forEach((m, i) => { w[m] = (w[m] ?? 0) + Math.pow(0.62, i); });
   return { weights: w };
 }
 
@@ -346,7 +347,7 @@ export default function SplitView() {
   }, [draft, submitText]);
 
   const convoProps = {
-    messages, picksCount: picks.length, maxPicks: MAX_PICKS, comprehension,
+    messages, comprehension,
     playing, pending, building, mode,
     draft, setDraft, onSubmit: submit,
     onExample: (text: string) => submitText(text),
@@ -366,6 +367,18 @@ export default function SplitView() {
       onOpenPlaylist={() => setPlaylistOpen(true)}
     />
   ) : null;
+
+  // emotion progress — lives under the wheel (where you pick), not in the input box
+  const pips = (
+    <div className="flex flex-col items-center gap-2">
+      <div className="flex gap-2">
+        {Array.from({ length: MAX_PICKS }).map((_, i) => (
+          <span key={i} className={`h-2.5 w-2.5 rounded-full transition ${i < picks.length ? "bg-accent" : "bg-bg-elev-2"}`} />
+        ))}
+      </div>
+      <span className="text-sm text-muted-2">{picks.length < MAX_PICKS ? `tap ${MAX_PICKS - picks.length} more to play` : "playing"}</span>
+    </div>
+  );
 
   const settingsBtn = (
     <button onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-muted transition hover:bg-bg-elev hover:text-fg">⚙</button>
@@ -405,6 +418,7 @@ export default function SplitView() {
               lyra<span className="text-accent">.</span>
             </div>
             <div className="mt-1 text-[11px] text-muted">the lyrics layer for your player</div>
+            <div className="mt-3 flex justify-start">{pips}</div>
           </div>
           <div className="min-h-0 flex-1">
             <ConversationPanel variant="floating" {...convoProps} />
@@ -423,15 +437,18 @@ export default function SplitView() {
 
       {/* ===== DESKTOP ===== */}
       <div className="hidden h-screen flex-col md:flex">
-        <main className="mx-auto flex w-full max-w-6xl flex-1 gap-6 overflow-hidden px-6 py-5">
+        <main className="flex w-full flex-1 gap-6 overflow-hidden px-6 py-5">
           <section className="flex w-1/2 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="mb-2 flex items-baseline gap-3">
               <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
               <span className="text-xs text-muted">the lyrics layer for your player</span>
               <div className="ml-auto">{settingsBtn}</div>
             </div>
-            <div className="flex-1">
-              <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape onSelect={pickEmotion} />
+            <div className="flex flex-1 flex-col items-center justify-center gap-4">
+              <div className="aspect-square w-full max-w-[500px]">
+                <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape onSelect={pickEmotion} />
+              </div>
+              {pips}
             </div>
           </section>
           <section className="flex w-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">

@@ -115,7 +115,7 @@ export default function EmotionWheel({
 
   function nodeStyle(name: MacroNode): { op: number; r: number } {
     const w = disp?.[name] ?? 0;
-    if (hovered === name || focused === name) return { op: 1, r: 6.5 }; // expand out to meet its label
+    if (hovered === name || focused === name) return { op: 1, r: 3 }; // modest dot — the halo + lit label carry the hover
     if (currentEmotion === name) return { op: 1, r: 3 };
     if (w > 0.04) return { op: rd(Math.min(1, 0.55 + w * 0.6)), r: rd(2 + w * 1.6) };
     return { op: 0.4, r: 2 }; // no dim-others-on-hover → no strobing when sweeping across nodes
@@ -162,21 +162,29 @@ export default function EmotionWheel({
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect?.(name); } }}
           >
             <circle cx={p.x} cy={p.y} r={7} fill="transparent" />
-            {focused === name && (
-              <circle cx={p.x} cy={p.y} r={5.5} fill="none" stroke="var(--accent)" strokeWidth={0.6} opacity={0.9} />
+            {(hovered === name || focused === name) && (
+              // a thin halo ring — no filled disc, so it never collides with the label
+              <circle cx={p.x} cy={p.y} r={4.5} fill="none" stroke={color} strokeWidth={0.6} opacity={0.9}
+                style={{ transition: "r .25s ease, opacity .25s ease" }} />
             )}
             <circle
               cx={p.x} cy={p.y} r={r} fill={color} opacity={op}
-              style={{ transition: "r .4s cubic-bezier(.22,.9,.25,1), opacity .5s ease" }}
+              style={{ transition: "r .3s cubic-bezier(.22,.9,.25,1), opacity .4s ease" }}
             />
             {showLabels && (
               <text
-                x={lp.x} y={lp.y + 1} textAnchor={anchor} fontSize={2.7}
-                fill={active ? "var(--fg)" : "var(--muted)"}
-                opacity={active ? 1 : 0.5}
-                style={{ transition: "opacity .5s ease, fill .3s ease" }}
+                x={lp.x} y={lp.y + 1} textAnchor={anchor} fontSize={active ? 3.5 : 3.3}
+                className="font-display"
+                fill="var(--fg)"
+                opacity={active ? 1 : 0.92}
+                style={{
+                  transition: "opacity .35s ease, font-size .25s ease",
+                  filter: active
+                    ? "drop-shadow(0 0 1.4px rgba(232,181,74,0.55))"
+                    : "drop-shadow(0 0 0.8px rgba(236,233,245,0.35))",
+                }}
               >
-                {name}
+                {name.toLowerCase()}
               </text>
             )}
           </g>
@@ -188,10 +196,11 @@ export default function EmotionWheel({
         <text
           key={`lab-${v.name}`}
           x={v.lx} y={v.ly} textAnchor={v.anchor} fontSize={2.7}
+          className="font-display"
           fill="var(--fg)" opacity={v.op}
           style={{ transition: "x .6s cubic-bezier(.22,.9,.25,1), y .6s cubic-bezier(.22,.9,.25,1), opacity .5s ease" }}
         >
-          {v.name}
+          {v.name.toLowerCase()}
         </text>
       ))}
     </svg>
