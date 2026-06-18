@@ -115,11 +115,10 @@ export default function EmotionWheel({
 
   function nodeStyle(name: MacroNode): { op: number; r: number } {
     const w = disp?.[name] ?? 0;
-    if (hovered === name || focused === name) return { op: 1, r: 3.2 };
+    if (hovered === name || focused === name) return { op: 1, r: 6.5 }; // expand out to meet its label
     if (currentEmotion === name) return { op: 1, r: 3 };
     if (w > 0.04) return { op: rd(Math.min(1, 0.55 + w * 0.6)), r: rd(2 + w * 1.6) };
-    if (hovered) return { op: 0.12, r: 2 };
-    return { op: 0.4, r: 2 };
+    return { op: 0.4, r: 2 }; // no dim-others-on-hover → no strobing when sweeping across nodes
   }
 
   const interactive = !!onSelect;

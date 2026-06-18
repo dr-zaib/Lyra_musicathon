@@ -1,14 +1,14 @@
 "use client";
 
-// The app — playback-flow model ("no loading screen, ever").
-//  - feeling in → POST /api/entry → the first entry track plays IMMEDIATELY (the ~14s
-//    journey generation is hidden behind it). The wheel shows the intent distribution.
-//  - skip (scroll/swipe by default, or ← → arrows via settings) walks the entry list;
-//    /api/refill tops it up.
-//  - pick a shape (deepen/evolve/escalate) → POST /api/journey → queued behind the
-//    current track. If you don't pick, it auto-generates near the entry track's end.
-//  - the agent narrates each step (transition_reason) into the feed; the cited verse
-//    rides in the player. Mock fallback on every endpoint → the demo never dies.
+// The app — emotion-buffer model.
+//  - You pick up to 3 emotions (wheel clicks) OR type a mood (the agent reads it into
+//    the same 3 slots). Emotions are a FIFO of the last 3 presses: pressing the same
+//    one twice doubles its weight; a 4th press drops the oldest. The wheel shape is a
+//    deterministic function of those picks — it only changes when you change picks.
+//  - The playlist starts the moment you reach 3 picks (typing fills all 3 at once).
+//  - Changing emotions or the mode (more like this / change mood / raise energy)
+//    rebuilds the UPCOMING queue but never touches the current track — it plays out,
+//    or you skip it. Mock fallback on every endpoint → the demo never dies.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -29,6 +29,8 @@ import type {
 } from "@/lib/types";
 
 type QueueItem = { track: TrackCandidate; verse: string | null; reason: string | null };
+
+const MAX_PICKS = 3; // the shape holds at most 3 emotions (FIFO of the last 3 presses)
 
 // Musixmatch gives no audio → enrich each track with a 30s preview client-side.
 // ISRC-first (Deezer exact match), text fallback — the route handles the strategy.
@@ -51,19 +53,31 @@ function dominantOf(d?: NodeDistribution): MacroNode | null {
   return best;
 }
 
-// Optimistic nudge for a node click — gives the wheel an instant reaction while the
-// agent turn is in flight (~14s on the real backend); the server response then
-// reconciles to the authoritative distribution. A *new* mood is slotted in BELOW the
-// existing ones (rank decay, matching the agent's "first mood strongest" rule) so the
-// spike doesn't briefly overshoot to full length and then snap shorter on reconcile.
-function optimisticNudge(prev: NodeDistribution | undefined, m: MacroNode): NodeDistribution {
-  const w = { ...(prev?.weights ?? {}) };
-  if (w[m] != null) { w[m] = Math.min(1, w[m] + 0.1); return { weights: w }; }
-  const vals = Object.values(w) as number[];
-  const max = vals.length ? Math.max(...vals) : 0;
-  const rank = vals.length; // 0 = first mood, 1 = second, …
-  w[m] = max > 0 ? max * Math.pow(0.62, rank) : 0.5;
+// The wheel shape = frequency of each mood in the picks buffer (double-press → 2×).
+function freqDistribution(picks: MacroNode[]): NodeDistribution | undefined {
+  if (!picks.length) return undefined;
+  const w: Partial<Record<MacroNode, number>> = {};
+  for (const m of picks) w[m] = (w[m] ?? 0) + 1;
+  for (const k of Object.keys(w) as MacroNode[]) w[k] = (w[k] as number) / picks.length;
   return { weights: w };
+}
+
+// Map the agent's weighted read of a typed mood into MAX_PICKS discrete slots
+// (largest-remainder), so text and wheel feed the exact same 3-emotion state.
+function distributionToPicks(d: NodeDistribution): MacroNode[] {
+  const entries = (Object.entries(d.weights) as [MacroNode, number][])
+    .filter(([, v]) => (v ?? 0) > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, MAX_PICKS);
+  if (!entries.length) return [];
+  const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
+  const alloc = entries.map(([m, v]) => ({ m, ideal: (v / total) * MAX_PICKS }));
+  const picks: MacroNode[] = [];
+  for (const a of alloc) for (let i = 0; i < Math.floor(a.ideal); i++) picks.push(a.m);
+  const byRem = [...alloc].sort((a, b) => (b.ideal % 1) - (a.ideal % 1));
+  let i = 0;
+  while (picks.length < MAX_PICKS && byRem.length) { picks.push(byRem[i % byRem.length].m); i++; }
+  return picks.slice(0, MAX_PICKS);
 }
 
 export default function SplitView() {
@@ -72,23 +86,29 @@ export default function SplitView() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
 
-  // intent → wheel
-  const [distribution, setDistribution] = useState<NodeDistribution | undefined>(undefined);
-  const [comprehension, setComprehension] = useState(0);
-  const seed = useMemo(() => dominantOf(distribution), [distribution]);
+  // emotions → wheel (FIFO buffer of the last 3 presses). The shape derives from this.
+  const [picks, setPicks] = useState<MacroNode[]>([]);
+  const picksRef = useRef<MacroNode[]>([]);
+  const distribution = useMemo(() => freqDistribution(picks), [picks]);
+  const comprehension = Math.min(1, picks.length / MAX_PICKS); // 0 → 3 picks (drives the pips + read bar)
+
+  // chosen mode (steer) — a persistent toggle, lit so you see where you are
+  const [mode, setMode] = useState<TrajectoryShape>("deepen");
+  const modeRef = useRef<TrajectoryShape>("deepen");
 
   // narration feed + composer
   const [messages, setMessages] = useState<Msg[]>([{ role: "agent", text: "describe how you feel — in your words." }]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
-  const [building, setBuilding] = useState(false); // a shape→journey is generating
-  const [showSkipHint, setShowSkipHint] = useState(false); // one-time "swipe to skip" teach
+  const [building, setBuilding] = useState(false); // a journey is (re)generating
+  const [showSkipHint, setShowSkipHint] = useState(false);
   const skipHintDone = useRef(false);
 
   // playback queue
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const queueRef = useRef<QueueItem[]>([]);
   const [index, setIndex] = useState(0);
-  const [shapeChosen, setShapeChosen] = useState(false);
+  const indexRef = useRef(0);
   const playedIsrcs = useRef<string[]>([]);
   const autoGenFired = useRef(false);
   const shownReason = useRef<string | null>(null);
@@ -100,8 +120,14 @@ export default function SplitView() {
   const [duration, setDuration] = useState(0);
 
   const playing = queue.length > 0;
+  const playingRef = useRef(false);
   const current = queue[index] ?? null;
   const currentEmotion = useMemo<MacroNode | null>(() => (current ? dominantOf(current.track.distribution) : null), [current]);
+
+  // keep refs in sync so the imperative triggers below read fresh values
+  useEffect(() => { queueRef.current = queue; playingRef.current = queue.length > 0; }, [queue]);
+  useEffect(() => { indexRef.current = index; }, [index]);
+  useEffect(() => { picksRef.current = picks; }, [picks]);
 
   // play the current track + narrate it into the feed
   /* eslint-disable react-hooks/set-state-in-effect -- syncing the <audio> element + narration */
@@ -123,50 +149,17 @@ export default function SplitView() {
   }, [index, queue]); // eslint-disable-line react-hooks/exhaustive-deps
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // describe the mood (type a line or click a node) → reads intent, shapes the wheel,
-  // raises the comprehension bar. NO playback — this composes the request. Repeatable.
-  const composeMood = useCallback(async (opts: { message?: string; seed_mood?: MacroNode }) => {
-    const { message, seed_mood } = opts;
-    if (!message && !seed_mood) return;
-    setPending(true);
-    if (message) setMessages((m) => [...m, { role: "user", text: message }]);
-    if (seed_mood) {
-      // instant optimistic feedback on a click; reconciled by the agent response
-      setMessages((m) => [...m, { role: "user", text: `→ ${seed_mood.toLowerCase()}` }]);
-      setDistribution((prev) => optimisticNudge(prev, seed_mood));
-      setComprehension((c) => Math.min(1, c + 0.15));
-    }
-    let turn: AgentTurn;
-    try {
-      const res = await fetch("/api/agent", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message, seed_mood, session_id: sessionId.current, language: settings.language }),
-      });
-      if (!res.ok) throw new Error(`agent ${res.status}`);
-      turn = await res.json();
-    } catch {
-      setPending(false);
-      setMessages((m) => [...m, { role: "agent", text: "i lost you for a second — say that again?" }]);
-      return;
-    }
-    setComprehension(turn.confidence);
-    setDistribution(turn.distribution);
-    // show the agent's line for typed turns; a click already spoke via its user bubble
-    if (turn.message?.trim() && !seed_mood) setMessages((m) => [...m, { role: "agent", text: turn.message }]);
-    setPending(false);
-  }, [settings.language]);
-
-  // commit the composed mood → entry track plays immediately (journey hides behind it)
-  const startEntry = useCallback(async (message?: string) => {
-    setPending(true); setShapeChosen(false); autoGenFired.current = false; shownReason.current = null;
-    if (message) setMessages((m) => [...m, { role: "user", text: message }]);
+  // first commit → entry track plays immediately (the journey hides behind it)
+  const startPlayback = useCallback(async (forPicks: MacroNode[], message?: string) => {
+    setPending(true); autoGenFired.current = false; shownReason.current = null;
+    modeRef.current = "deepen"; setMode("deepen");
+    const seedMood = dominantOf(freqDistribution(forPicks));
     let data: EntryResponse;
     try {
       const res = await fetch("/api/entry", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message, session_id: sessionId.current, known_new: settings.knownNew, language: settings.language }),
+        body: JSON.stringify({ message, seed_mood: seedMood, session_id: sessionId.current, known_new: settings.knownNew, language: settings.language }),
       });
       if (!res.ok) throw new Error(`entry ${res.status}`);
       data = await res.json();
@@ -175,19 +168,16 @@ export default function SplitView() {
       setMessages((m) => [...m, { role: "agent", text: "i lost you for a second — say that again?" }]);
       return;
     }
-    setComprehension(data.confidence); setDistribution(data.distribution);
     const cands = data.entry_candidates ?? [];
     if (!cands.length) { setPending(false); return; }
     playedIsrcs.current = [];
     const first = await enrichTrack(cands[0]);
     setQueue([{ track: first, verse: null, reason: null }]);
     setIndex(0); setPending(false);
-    // teach the swipe-to-skip gesture once, when the first track starts (scroll mode)
     if (settings.skipMode === "scroll" && !skipHintDone.current) {
       skipHintDone.current = true; setShowSkipHint(true);
       setTimeout(() => setShowSkipHint(false), 4500);
     }
-    // enrich the rest behind the scenes
     Promise.all(cands.slice(1).map(enrichTrack)).then((rest) =>
       setQueue((q) => [...q, ...rest.map((t) => ({ track: t, verse: null, reason: null }))]),
     );
@@ -195,7 +185,7 @@ export default function SplitView() {
 
   const refill = useCallback(async () => {
     try {
-      const remaining = queue.slice(index).map((q) => q.track);
+      const remaining = queueRef.current.slice(indexRef.current).map((q) => q.track);
       const res = await fetch("/api/refill", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -207,18 +197,17 @@ export default function SplitView() {
     } catch {
       // best-effort
     }
-  }, [queue, index, settings.knownNew, settings.language]);
+  }, [settings.knownNew, settings.language]);
 
-  // pick a shape → journey queued behind the current track (entry track = its head).
-  // Progressive: the first step lands as soon as it's enriched (kills the freeze), the
-  // rest stream in behind it. `silent` skips the "extending…" indicator (auto-gen).
-  const chooseShape = useCallback(async (shape: TrajectoryShape, silent = false) => {
-    if (!seed) return;
-    setShapeChosen(true);
+  // rebuild the UPCOMING queue (new mood/mode) WITHOUT touching the current track.
+  // It plays out (or the user skips); the new-mood tracks queue behind it. Progressive.
+  const rebuildTail = useCallback(async (forPicks: MacroNode[], shape: TrajectoryShape, silent = false) => {
+    const seedMood = dominantOf(freqDistribution(forPicks));
+    if (!seedMood) return;
     if (!silent) setBuilding(true);
     let traj: Trajectory;
     try {
-      const body: JourneyRequest = { seed_mood: seed, shape, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current };
+      const body: JourneyRequest = { seed_mood: seedMood, shape, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current };
       const res = await fetch("/api/journey", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -230,30 +219,79 @@ export default function SplitView() {
       setBuilding(false);
       return;
     }
-    const at = index;
-    const curId = queue[at]?.track.track_id;
+    const at = indexRef.current;
+    const curId = queueRef.current[at]?.track.track_id;
     const steps = traj.steps.filter((s) => s.selected_track.track_id !== curId);
     if (!steps.length) { setBuilding(false); return; }
-    // first step appended immediately, rest behind the scenes
     const first = steps[0];
     const firstItem: QueueItem = { track: await enrichTrack(first.selected_track), verse: first.citable_verse ?? null, reason: first.transition_reason ?? null };
-    setQueue((q) => [...q.slice(0, at + 1), firstItem]);
+    setQueue((q) => [...q.slice(0, at + 1), firstItem]); // keep [0..current], replace the tail
     setBuilding(false);
     if (steps.length > 1) {
       Promise.all(
         steps.slice(1).map(async (s) => ({ track: await enrichTrack(s.selected_track), verse: s.citable_verse ?? null, reason: s.transition_reason ?? null })),
       ).then((rest) => setQueue((q) => [...q, ...rest]));
     }
-  }, [seed, index, queue, settings.knownNew, settings.language]);
+  }, [settings.knownNew, settings.language]);
+
+  // a change to the emotion buffer: start (first time we hit 3) or rebuild the tail
+  const onPicksChanged = useCallback((next: MacroNode[]) => {
+    if (next.length < MAX_PICKS) return; // not ready yet — just shaping the wheel
+    if (!playingRef.current) startPlayback(next);
+    else rebuildTail(next, modeRef.current);
+  }, [startPlayback, rebuildTail]);
+
+  // click an emotion node → push to the FIFO buffer (max 3; same mood twice = 2×)
+  const pickEmotion = useCallback((m: MacroNode) => {
+    const next = [...picksRef.current, m];
+    if (next.length > MAX_PICKS) next.shift();
+    picksRef.current = next; setPicks(next);
+    onPicksChanged(next);
+  }, [onPicksChanged]);
+
+  // type a mood → the agent reads it into the same 3 slots, then start/rebuild
+  const submitText = useCallback(async (text: string) => {
+    setPending(true);
+    setMessages((m) => [...m, { role: "user", text }]);
+    let turn: AgentTurn;
+    try {
+      const res = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: text, session_id: sessionId.current, language: settings.language }),
+      });
+      if (!res.ok) throw new Error(`agent ${res.status}`);
+      turn = await res.json();
+    } catch {
+      setPending(false);
+      setMessages((m) => [...m, { role: "agent", text: "i lost you for a second — say that again?" }]);
+      return;
+    }
+    if (turn.message?.trim()) setMessages((m) => [...m, { role: "agent", text: turn.message }]);
+    const next = distributionToPicks(turn.distribution);
+    setPending(false);
+    if (!next.length) return; // couldn't read a mood — leave it to the user to add more
+    picksRef.current = next; setPicks(next);
+    if (!playingRef.current) startPlayback(next, text); else rebuildTail(next, modeRef.current);
+  }, [settings.language, startPlayback, rebuildTail]);
+
+  // surprise me → start from pure serendipity (no picks)
+  const surprise = useCallback(() => { startPlayback([]); }, [startPlayback]);
+
+  // steer: pick a mode → light it + rebuild the tail with it
+  const chooseMode = useCallback((shape: TrajectoryShape) => {
+    modeRef.current = shape; setMode(shape);
+    if (playingRef.current) rebuildTail(picksRef.current, shape);
+  }, [rebuildTail]);
 
   const next = useCallback(() => {
     setShowSkipHint(false);
     setIndex((i) => {
-      const ni = Math.min(queue.length - 1, i + 1);
-      if (!shapeChosen && queue.length - ni <= 2) refill();
+      const ni = Math.min(queueRef.current.length - 1, i + 1);
+      if (queueRef.current.length - ni <= 2) refill();
       return ni;
     });
-  }, [queue.length, shapeChosen, refill]);
+  }, [refill]);
   const prev = useCallback(() => { setShowSkipHint(false); setIndex((i) => Math.max(0, i - 1)); }, []);
 
   const toggle = () => {
@@ -265,10 +303,10 @@ export default function SplitView() {
 
   const onTimeUpdate = (t: number) => {
     setCurrentTime(t);
-    // hide the ~14s: if no shape chosen, auto-generate before the entry track ends
-    if (!shapeChosen && !autoGenFired.current && playing && duration > 0 && duration - t <= 8) {
+    // hide the gen time: near the entry track's end, auto-build the journey (silent)
+    if (!autoGenFired.current && playingRef.current && duration > 0 && duration - t <= 8) {
       autoGenFired.current = true;
-      chooseShape("deepen", true); // silent: hide the journey gen behind the entry track
+      rebuildTail(picksRef.current, modeRef.current, true);
     }
   };
 
@@ -276,9 +314,10 @@ export default function SplitView() {
     const a = audioRef.current; if (a) { a.pause(); a.removeAttribute("src"); }
     sessionId.current = crypto.randomUUID();
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
+    picksRef.current = []; modeRef.current = "deepen";
     setMessages([{ role: "agent", text: "describe how you feel — in your words." }]);
-    setComprehension(0); setDistribution(undefined); setPending(false); setBuilding(false); setShowSkipHint(false);
-    setQueue([]); setIndex(0); setShapeChosen(false); setPlaylistOpen(false);
+    setPicks([]); setMode("deepen"); setPending(false); setBuilding(false); setShowSkipHint(false);
+    setQueue([]); setIndex(0); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
 
@@ -303,23 +342,20 @@ export default function SplitView() {
     const text = draft.trim();
     if (!text) return;
     setDraft("");
-    // before playback: typing composes the mood; during playback: a quick "more like
-    // this" steer phrased in the user's words.
-    if (queue.length > 0) startEntry(text); else composeMood({ message: text });
-  }, [draft, queue.length, startEntry, composeMood]);
-
-  const hasSignal = comprehension > 0 || (!!distribution && Object.keys(distribution.weights).length > 0);
+    submitText(text);
+  }, [draft, submitText]);
 
   const convoProps = {
-    messages, comprehension, playing, pending, building, hasSignal,
+    messages, picksCount: picks.length, maxPicks: MAX_PICKS, comprehension,
+    playing, pending, building, mode,
     draft, setDraft, onSubmit: submit,
-    onExample: (text: string) => composeMood({ message: text }),
-    onCreate: () => startEntry(),
-    onSurprise: () => startEntry(),
-    onDeepen: () => chooseShape("deepen"),
-    onEvolve: () => chooseShape("evolve"),
-    onEscalate: () => chooseShape("escalate"),
+    onExample: (text: string) => submitText(text),
+    onSurprise: surprise,
+    onMode: chooseMode,
+    onReset: reset,
+    canReset: playing || picks.length > 0,
   };
+
   const player = playing ? (
     <PlayerBar
       track={current?.track ?? null}
@@ -331,14 +367,8 @@ export default function SplitView() {
     />
   ) : null;
 
-  const iconBtn = "flex h-10 w-10 items-center justify-center rounded-full text-muted transition hover:bg-bg-elev hover:text-fg";
-  const controls = (canReset: boolean) => (
-    <div className="flex items-center">
-      <button onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings" className={`${iconBtn} text-lg`}>⚙</button>
-      {canReset && (
-        <button onClick={reset} aria-label="start over" title="start over" className={`${iconBtn} text-lg`}>↺</button>
-      )}
-    </div>
+  const settingsBtn = (
+    <button onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-muted transition hover:bg-bg-elev hover:text-fg">⚙</button>
   );
 
   return (
@@ -357,10 +387,10 @@ export default function SplitView() {
 
       {/* ===== MOBILE ===== */}
       <div className="relative flex h-screen flex-col overflow-hidden md:hidden">
-        <div className="absolute right-3 top-3 z-30">{controls(playing || comprehension > 0)}</div>
+        <div className="absolute right-3 top-3 z-30">{settingsBtn}</div>
         {/* the wheel builds its shape in the background — also the scroll/swipe skip surface */}
         <div
-          className="pointer-events-auto absolute left-1/2 top-[36%] aspect-square w-[150vw] max-w-[600px] -translate-x-1/2 -translate-y-1/2 opacity-50"
+          className="pointer-events-auto absolute left-1/2 top-[34%] aspect-square w-[150vw] max-w-[600px] -translate-x-1/2 -translate-y-1/2 opacity-50"
           onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         >
           <div className="lyra-breathe h-full w-full">
@@ -398,10 +428,10 @@ export default function SplitView() {
             <div className="mb-2 flex items-baseline gap-3">
               <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
               <span className="text-xs text-muted">the lyrics layer for your player</span>
-              <div className="ml-auto">{controls(playing || comprehension > 0)}</div>
+              <div className="ml-auto">{settingsBtn}</div>
             </div>
             <div className="flex-1">
-              <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape onSelect={(m) => composeMood({ seed_mood: m })} />
+              <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape onSelect={pickEmotion} />
             </div>
           </section>
           <section className="flex w-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">

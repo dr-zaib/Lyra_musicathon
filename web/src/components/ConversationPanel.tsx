@@ -1,19 +1,25 @@
 "use client";
 
-// The agent conversation: thread (messages + path cards) + comprehension bar +
-// quick actions + composer. Shared by both layouts:
+// The agent panel: a big "describe your mood" box up top (the invitation to write),
+// the 3-emotion progress (pips — show don't tell), the steer pills while playing, the
+// narration feed, and the "lyra's read" bar pinned last. Shared by both layouts:
 //  - variant "panel"    → desktop split (bordered card)
 //  - variant "floating" → mobile living-background (frosted, over the scrim)
 
 import { useEffect, useState } from "react";
 
+import type { TrajectoryShape } from "@/lib/types";
+
 export type Msg = { role: "agent" | "user"; text: string };
 
-// Cold-start seeds — show the user the *kind* of thing to type (a feeling, not a genre).
-// Chosen to read clearly on the mood map (restless→anxiety, missing→nostalgia, hopeful→hope).
 const EXAMPLES = ["restless and wired", "missing someone", "quietly hopeful"];
 
-// Lyra's read, as a word instead of a bare % (a low number shouldn't read as "failing").
+const MODES: { key: TrajectoryShape; label: string }[] = [
+  { key: "deepen", label: "more like this" },
+  { key: "evolve", label: "change the mood" },
+  { key: "escalate", label: "raise the energy" },
+];
+
 function readLabel(c: number): string {
   if (c <= 0) return "listening";
   if (c < 0.34) return "tuning in";
@@ -22,8 +28,7 @@ function readLabel(c: number): string {
   return "got it";
 }
 
-// While a turn is in flight (~14s on the real backend) Lyra "thinks" — dots + a
-// rotating status line so the wait never looks stuck.
+// While a turn is in flight Lyra "thinks" — dots + a rotating status line.
 const THINKING = ["reading the feeling…", "walking the catalog…", "citing the line…"];
 function ThinkingIndicator({ floating }: { floating: boolean }) {
   const [i, setI] = useState(0);
@@ -31,20 +36,11 @@ function ThinkingIndicator({ floating }: { floating: boolean }) {
     const id = setInterval(() => setI((n) => (n + 1) % THINKING.length), 2500);
     return () => clearInterval(id);
   }, []);
-  const bubble = floating
-    ? "border border-white/10 bg-white/[0.07] backdrop-blur-sm"
-    : "bg-bg-elev/70";
+  const bubble = floating ? "border border-white/10 bg-white/[0.07] backdrop-blur-sm" : "bg-bg-elev/70";
   return (
-    <div
-      className={`flex max-w-[80%] items-center gap-2 rounded-xl px-3 py-2.5 ${bubble}`}
-      role="status"
-      aria-live="polite"
-      aria-label="lyra is thinking"
-    >
+    <div className={`flex max-w-[80%] items-center gap-2 rounded-xl px-3 py-2.5 ${bubble}`} role="status" aria-live="polite" aria-label="lyra is thinking">
       <span className="flex gap-1">
-        <span className="lyra-typing-dot" />
-        <span className="lyra-typing-dot" />
-        <span className="lyra-typing-dot" />
+        <span className="lyra-typing-dot" /><span className="lyra-typing-dot" /><span className="lyra-typing-dot" />
       </span>
       <span className="text-xs text-muted">{THINKING[i]}</span>
     </div>
@@ -54,173 +50,140 @@ function ThinkingIndicator({ floating }: { floating: boolean }) {
 export default function ConversationPanel({
   variant,
   messages,
+  picksCount,
+  maxPicks,
   comprehension,
   playing,
   pending,
   building,
-  hasSignal,
+  mode,
   draft,
   setDraft,
   onSubmit,
   onExample,
-  onCreate,
   onSurprise,
-  onDeepen,
-  onEvolve,
-  onEscalate,
+  onMode,
+  onReset,
+  canReset,
 }: {
   variant: "panel" | "floating";
   messages: Msg[];
+  picksCount: number;
+  maxPicks: number;
   comprehension: number;
   playing: boolean;
   pending: boolean;
   building: boolean;
-  hasSignal: boolean;
+  mode: TrajectoryShape;
   draft: string;
   setDraft: (s: string) => void;
   onSubmit: () => void;
   onExample: (text: string) => void;
-  onCreate: () => void;
   onSurprise: () => void;
-  onDeepen: () => void;
-  onEvolve: () => void;
-  onEscalate: () => void;
+  onMode: (shape: TrajectoryShape) => void;
+  onReset: () => void;
+  canReset: boolean;
 }) {
   const floating = variant === "floating";
-  // cold start: nothing typed yet → show the value-prop hero instead of the lone seed
-  // bubble, so a first-timer (or a judge) gets it in one glance. Yields the moment you act.
-  const cold = !playing && messages.length <= 1;
+  const cold = !playing && messages.length <= 1 && picksCount === 0;
 
-  const agentBubble = floating
-    ? "bg-white/[0.07] border border-white/10 text-fg/90 backdrop-blur-sm"
-    : "bg-bg-elev/70 text-fg/90";
-  const userBubble = floating
-    ? "ml-auto border border-accent/25 bg-accent/15 text-fg backdrop-blur-sm"
-    : "ml-auto bg-bg-elev-2 text-fg";
+  const agentBubble = floating ? "bg-white/[0.07] border border-white/10 text-fg/90 backdrop-blur-sm" : "bg-bg-elev/70 text-fg/90";
+  const userBubble = floating ? "ml-auto border border-accent/25 bg-accent/15 text-fg backdrop-blur-sm" : "ml-auto bg-bg-elev-2 text-fg";
+  const inputBase = floating ? "border-white/15 bg-white/[0.06] backdrop-blur-sm" : "border-border bg-transparent";
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {cold ? (
-          <div className="flex h-full flex-col items-center justify-center px-2 text-center">
-            <h1 className="font-display text-[1.75rem] font-medium lowercase leading-[1.15] tracking-tight text-fg">
-              tell lyra your mood,<br />get a playlist.
-            </h1>
-            <p className="mt-3 max-w-[18rem] text-sm text-muted">
-              built from the lyrics — songs that say what you feel, not just the genre.
-            </p>
-          </div>
-        ) : (
-          <>
-            {messages.map((m, i) =>
-              m.text.trim() ? (
-                <div
-                  key={i}
-                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                    m.role === "agent" ? agentBubble : userBubble
-                  }`}
-                >
-                  {m.text}
-                </div>
-              ) : null,
-            )}
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+      {/* reset (start over) — top-right of the panel */}
+      {canReset && (
+        <div className="-mb-2 flex justify-end">
+          <button onClick={onReset} aria-label="start over" title="start over" className="flex h-8 w-8 items-center justify-center rounded-full text-base text-muted transition hover:bg-bg-elev hover:text-fg">↺</button>
+        </div>
+      )}
 
-            {pending && <ThinkingIndicator floating={floating} />}
-          </>
+      {/* the invitation — a big box, the first thing the eye lands on */}
+      <div>
+        {cold && (
+          <div className="mb-2">
+            <h1 className="font-display text-[1.6rem] font-medium lowercase leading-[1.15] tracking-tight text-fg">tell lyra your mood,<br />get a playlist.</h1>
+            <p className="mt-1.5 text-xs text-muted">three emotions — type one, or tap them on the wheel.</p>
+          </div>
         )}
+        <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="flex flex-col gap-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmit(); } }}
+            placeholder="describe how you feel…"
+            aria-label="describe your mood"
+            rows={3}
+            className={`w-full resize-none rounded-xl border px-3 py-2.5 text-sm leading-relaxed outline-none focus:border-accent ${inputBase}`}
+          />
+          <div className="flex items-center gap-2">
+            {/* emotion pips — show, don't tell */}
+            <div className="flex items-center gap-1.5" aria-label={`${picksCount} of ${maxPicks} emotions`}>
+              {Array.from({ length: maxPicks }).map((_, i) => (
+                <span key={i} className={`h-1.5 w-1.5 rounded-full transition ${i < picksCount ? "bg-accent" : "bg-bg-elev-2"}`} />
+              ))}
+              <span className="ml-1 text-[11px] text-muted-2">{picksCount < maxPicks ? `${maxPicks - picksCount} more to play` : "playing"}</span>
+            </div>
+            <button type="submit" className="ml-auto rounded-xl border border-border px-4 py-1.5 text-sm text-muted transition hover:border-accent hover:text-fg">send</button>
+          </div>
+        </form>
       </div>
 
-      <div className={`px-4 pt-3 ${floating ? "" : "border-t border-border"}`}>
+      {/* cold-start: example moods + surprise · playing: the steer pills (lit by mode) */}
+      {!playing ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            {EXAMPLES.map((ex) => (
+              <button key={ex} onClick={() => onExample(ex)} className="rounded-full border border-border px-3 py-1 text-[11px] text-muted transition hover:border-accent hover:text-fg">{ex}</button>
+            ))}
+          </div>
+          <button onClick={onSurprise} className="self-start text-xs text-muted transition hover:text-fg">or surprise me</button>
+        </div>
+      ) : (
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted-2">
+            <span>where to next?</span>
+            {building && <span className="text-muted">building…</span>}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {MODES.map((m) => {
+              const active = mode === m.key;
+              return (
+                <button
+                  key={m.key}
+                  onClick={() => onMode(m.key)}
+                  aria-pressed={active}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition ${active ? "border-accent bg-accent/15 text-fg" : "border-border text-muted hover:border-accent hover:text-fg"}`}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* narration feed */}
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+        {messages.map((m, i) =>
+          m.text.trim() ? (
+            <div key={i} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.role === "agent" ? agentBubble : userBubble}`}>{m.text}</div>
+          ) : null,
+        )}
+        {pending && <ThinkingIndicator floating={floating} />}
+      </div>
+
+      {/* lyra's read — pinned last */}
+      <div>
         <div className="mb-1 flex justify-between text-[11px] text-muted-2">
           <span>lyra’s read on you</span>
           <span className="text-muted">{readLabel(comprehension)}</span>
         </div>
-        <div
-          className="h-1.5 overflow-hidden rounded-full bg-bg-elev-2"
-          role="progressbar"
-          aria-label={`lyra's read on you: ${readLabel(comprehension)}`}
-          aria-valuenow={Math.round(comprehension * 100)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
+        <div className="h-1.5 overflow-hidden rounded-full bg-bg-elev-2" role="progressbar" aria-label={`lyra's read on you: ${readLabel(comprehension)}`} aria-valuenow={Math.round(comprehension * 100)} aria-valuemin={0} aria-valuemax={100}>
           <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.round(comprehension * 100)}%` }} />
         </div>
-
-        {!playing ? (
-          // before playback: describe the mood (type, pick an example, or click nodes),
-          // then commit. once there's signal, "create my playlist" is the gold trigger.
-          <div className="mt-3 flex flex-col items-center gap-2">
-            {hasSignal ? (
-              <button
-                onClick={onCreate}
-                className="w-full rounded-xl bg-accent px-4 py-2 text-sm font-medium text-bg transition hover:brightness-110"
-              >
-                create my playlist ▶
-              </button>
-            ) : (
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {EXAMPLES.map((ex) => (
-                  <button
-                    key={ex}
-                    onClick={() => onExample(ex)}
-                    className="rounded-full border border-border px-3 py-1 text-[11px] text-muted transition hover:border-accent hover:text-fg"
-                  >
-                    {ex}
-                  </button>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={onSurprise}
-              className="text-center text-xs text-muted transition hover:text-fg"
-            >
-              or surprise me
-            </button>
-          </div>
-        ) : (
-          // playing: steer where the playlist goes next — the three trajectory shapes
-          <div className="mt-3">
-            <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted-2">
-              <span>your playlist — where to next?</span>
-              {building && <span className="text-muted">extending your playlist…</span>}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={onDeepen}
-                className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
-              >
-                more like this
-              </button>
-              <button
-                onClick={onEvolve}
-                className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
-              >
-                change the mood
-              </button>
-              <button
-                onClick={onEscalate}
-                className="rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-accent hover:text-fg"
-              >
-                raise the energy
-              </button>
-            </div>
-          </div>
-        )}
-
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="my-3 flex gap-2">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="describe your mood"
-            aria-label="describe your mood"
-            className={`h-10 flex-1 rounded-xl border px-3 text-sm outline-none focus:border-accent ${
-              floating ? "border-white/15 bg-white/[0.06] backdrop-blur-sm" : "border-border bg-transparent"
-            }`}
-          />
-          <button type="submit" className="rounded-xl border border-border px-4 text-sm text-muted transition hover:border-accent hover:text-fg">
-            send
-          </button>
-        </form>
       </div>
     </div>
   );
