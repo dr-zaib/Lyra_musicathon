@@ -400,7 +400,7 @@ export default function SplitView() {
 
       {/* ===== MOBILE ===== */}
       <div className="relative flex h-screen flex-col overflow-hidden md:hidden">
-        <div className="absolute right-3 top-3 z-30">{settingsBtn}</div>
+        <div className="absolute right-4 top-4 z-30">{settingsBtn}</div>
         {/* the wheel builds its shape in the background — also the scroll/swipe skip surface */}
         <div
           className="pointer-events-auto absolute left-1/2 top-[34%] aspect-square w-[150vw] max-w-[600px] -translate-x-1/2 -translate-y-1/2 opacity-50"
@@ -413,12 +413,11 @@ export default function SplitView() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-bg via-bg/85 to-transparent" />
 
         <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-          <div className="px-4 pt-4">
+          <div className="px-5 pt-6">
             <div className="font-display text-2xl font-medium lowercase leading-none tracking-tight">
               lyra<span className="text-accent">.</span>
             </div>
             <div className="mt-1 text-[11px] text-muted">the lyrics layer for your player</div>
-            <div className="mt-3 flex justify-start">{pips}</div>
           </div>
           <div className="min-h-0 flex-1">
             <ConversationPanel variant="floating" {...convoProps} />
