@@ -16,19 +16,19 @@ function fmt(s: number): string {
 }
 
 const PrevIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 6h2v12H7zM20 6v12L9 12z" /></svg>
+  <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 6h2v12H7zM20 6v12L9 12z" /></svg>
 );
 const NextIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15 6h2v12h-2zM4 6l11 6L4 18z" /></svg>
+  <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15 6h2v12h-2zM4 6l11 6L4 18z" /></svg>
 );
 const PlayIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
 );
 const PauseIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z" /></svg>
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z" /></svg>
 );
 const QueueIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
     <line x1="4" y1="7" x2="15" y2="7" /><line x1="4" y1="12" x2="15" y2="12" /><line x1="4" y1="17" x2="11" y2="17" />
     <circle cx="18" cy="16" r="2.5" /><line x1="20.5" y1="16" x2="20.5" y2="8.5" /><path d="M20.5 8.5 L16.5 9.7" />
   </svg>
@@ -102,7 +102,7 @@ export default function PlayerBar({
   onSeek: (t: number) => void;
   onOpenPlaylist: () => void;
 }) {
-  const ctrl = "flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:text-fg disabled:opacity-30";
+  const ctrl = "flex h-12 w-12 items-center justify-center rounded-full text-muted transition hover:text-fg disabled:opacity-30";
 
   return (
     <div className="sticky bottom-0 z-20 border-t border-border bg-bg-elev/90 backdrop-blur">
@@ -149,7 +149,7 @@ export default function PlayerBar({
               <button onClick={onPrev} disabled={!hasPrev} className={ctrl} aria-label="Previous"><PrevIcon /></button>
               <button
                 onClick={onToggle}
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-bg transition hover:scale-105 hover:brightness-110"
+                className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-bg transition hover:scale-105 hover:brightness-110"
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? <PauseIcon /> : <PlayIcon />}
