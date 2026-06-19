@@ -97,6 +97,8 @@ export default function SplitView() {
   // emotions → wheel (FIFO buffer of the last 3 presses). The shape derives from this.
   const [picks, setPicks] = useState<MacroNode[]>([]);
   const picksRef = useRef<MacroNode[]>([]);
+  // a longer memory of recently-touched emotions (last 6) → the compass constellation trail
+  const [pickHistory, setPickHistory] = useState<MacroNode[]>([]);
   const distribution = useMemo(() => freqDistribution(picks), [picks]);
   const comprehension = Math.min(1, picks.length / MAX_PICKS); // 0 → 3 picks (drives the pips + read bar)
 
@@ -307,6 +309,7 @@ export default function SplitView() {
     const next = [...picksRef.current, m];
     if (next.length > MAX_PICKS) next.shift();
     picksRef.current = next; setPicks(next);
+    setPickHistory((h) => [...h, m].slice(-6));
     onPicksChanged(next);
   }, [onPicksChanged]);
 
@@ -377,7 +380,7 @@ export default function SplitView() {
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     picksRef.current = []; modeRef.current = "deepen";
     setMessages([]);
-    setPicks([]); setMode("deepen"); setPending(false); setShowSkipHint(false);
+    setPicks([]); setPickHistory([]); setMode("deepen"); setPending(false); setShowSkipHint(false);
     setQueue([]); setIndex(0); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
@@ -543,7 +546,7 @@ export default function SplitView() {
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="flex min-h-0 flex-1 items-center justify-center">
               {compassMode ? (
-                <div className="h-full w-full"><CompassScene dominant={moodMacro} moodColor={moodColor} comprehension={comprehension} picks={picks} onSelect={pickEmotion} /></div>
+                <div className="h-full w-full"><CompassScene dominant={moodMacro} moodColor={moodColor} comprehension={comprehension} trail={pickHistory.length ? pickHistory : picks} onSelect={pickEmotion} /></div>
               ) : (
                 <div className="relative aspect-square h-full max-h-[900px]">
                   <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />

@@ -43,8 +43,8 @@ function Label({ text, color, position, big }: { text: string; color: string; po
   );
 }
 
-function Dial({ dominant, moodColor, comprehension, picks, onSelect }: {
-  dominant: MacroNode | null; moodColor: string; comprehension: number; picks: MacroNode[]; onSelect?: (m: MacroNode) => void;
+function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
+  dominant: MacroNode | null; moodColor: string; comprehension: number; trail: MacroNode[]; onSelect?: (m: MacroNode) => void;
 }) {
   const ref = useRef<THREE.Group>(null);
   const inited = useRef(false);
@@ -63,12 +63,12 @@ function Dial({ dominant, moodColor, comprehension, picks, onSelect }: {
   });
 
   const trailPts = useMemo(() => {
-    const seq = picks.length ? picks : [];
+    const seq = trail.length ? trail : [];
     return seq.map((m) => {
       const a = baseAngle(idxOf(m)); const rr = R * 0.84;
       return new THREE.Vector3(Math.cos(a) * rr, Math.sin(a) * rr, 0.1);
     });
-  }, [picks]);
+  }, [trail]);
   const trailGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints(trailPts), [trailPts]);
 
   // faint constellation spokes from the centre to each emotion (the "rays" Alberto liked)
@@ -144,8 +144,8 @@ function Needle() {
   );
 }
 
-export default function CompassScene({ dominant, moodColor, comprehension, picks, onSelect }: {
-  dominant: MacroNode | null; moodColor: string; comprehension: number; picks: MacroNode[]; onSelect?: (m: MacroNode) => void;
+export default function CompassScene({ dominant, moodColor, comprehension, trail, onSelect }: {
+  dominant: MacroNode | null; moodColor: string; comprehension: number; trail: MacroNode[]; onSelect?: (m: MacroNode) => void;
 }) {
   return (
     <Canvas
@@ -156,8 +156,8 @@ export default function CompassScene({ dominant, moodColor, comprehension, picks
       style={{ width: "100%", height: "100%", background: "transparent" }}
     >
       <ambientLight intensity={0.6} />
-      <group rotation-x={-1.0} position={[-2, 0.5, -2]} scale={0.82}>
-        <Dial dominant={dominant} moodColor={moodColor} comprehension={comprehension} picks={picks} onSelect={onSelect} />
+      <group rotation-x={-1.0} position={[-2, 0.5, -2]} scale={0.9}>
+        <Dial dominant={dominant} moodColor={moodColor} comprehension={comprehension} trail={trail} onSelect={onSelect} />
         <Needle />
       </group>
       <EffectComposer>
