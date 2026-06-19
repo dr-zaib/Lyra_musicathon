@@ -70,7 +70,6 @@ function Seek({
 
 export default function PlayerBar({
   track,
-  verse,
   isPlaying,
   currentTime,
   duration,
@@ -83,7 +82,6 @@ export default function PlayerBar({
   onOpenPlaylist,
 }: {
   track: TrackCandidate | null;
-  verse?: string | null;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -103,13 +101,6 @@ export default function PlayerBar({
       <Seek currentTime={currentTime} duration={duration} onSeek={onSeek} className="w-full" />
 
       <div className="mx-auto max-w-6xl px-4">
-        {/* the cited line — the lyrics-first signature (Musixmatch richsync) */}
-        {verse && (
-          <div className="flex items-center justify-center gap-2 pt-2 text-center">
-            <span className="truncate text-xs italic text-fg/80">“{verse}”</span>
-            <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-muted-2">richsync</span>
-          </div>
-        )}
 
         <div className="flex items-center gap-3 py-2 md:grid md:grid-cols-[1fr_auto_1fr] md:gap-4">
           {/* LEFT — identity */}

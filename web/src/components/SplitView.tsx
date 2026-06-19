@@ -15,6 +15,7 @@ import dynamic from "next/dynamic";
 
 import ConversationPanel, { type Msg } from "./ConversationPanel";
 import EmotionWheel from "./EmotionWheel";
+import LyricBanner from "./LyricBanner";
 import PlayerBar from "./PlayerBar";
 import PlaylistView from "./PlaylistView";
 import Settings, { type PlaybackSettings, defaultLanguage } from "./Settings";
@@ -428,7 +429,6 @@ export default function SplitView() {
   const player = playing ? (
     <PlayerBar
       track={current?.track ?? null}
-      verse={current?.verse ?? null}
       isPlaying={isPlaying} currentTime={currentTime} duration={duration}
       hasPrev={index > 0} hasNext={index < queue.length - 1}
       onToggle={toggle} onPrev={prev} onNext={next} onSeek={seek}
@@ -515,7 +515,7 @@ export default function SplitView() {
             <div className="font-display text-2xl font-medium lowercase leading-none tracking-tight">
               lyra<span className="text-accent">.</span>
             </div>
-            <div className="mt-1 text-[11px] text-muted">the lyrics layer for your player</div>
+            <div className="mt-1"><LyricBanner verse={current?.verse ?? null} /></div>
           </div>
           <div className="min-h-0 flex-1">
             <ConversationPanel variant="floating" {...convoProps} />
@@ -537,7 +537,7 @@ export default function SplitView() {
         {/* page header — title on the left, settings pinned top-right of the whole page */}
         <header className="flex shrink-0 items-baseline gap-3 pl-7 pr-16 pt-5">
           <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
-          <span className="text-xs text-muted">the lyrics layer for your player</span>
+          <div className="min-w-0 flex-1"><LyricBanner verse={current?.verse ?? null} /></div>
           <div className="ml-auto">{settingsBtn}</div>
         </header>
         {/* main RESERVES the player's strip at the bottom at all times (pb-[104px]), so its

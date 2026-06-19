@@ -19,6 +19,7 @@ const WHEEL_ORDER: MacroNode[] = [
 ];
 const N = WHEEL_ORDER.length;
 const R = 11;
+const DIAL_F = 0.35; // hybrid rotation: the dial turns this fraction toward the emotion, the needle covers the rest
 const idxOf = (m: MacroNode) => WHEEL_ORDER.indexOf(m);
 const baseAngle = (i: number) => (i / N) * Math.PI * 2; // 0 at +X, CCW
 
@@ -49,7 +50,7 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
   const ref = useRef<THREE.Group>(null);
   const inited = useRef(false);
   const reduced = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
-  const target = dominant ? (Math.PI / 2 - baseAngle(idxOf(dominant))) : 0;
+  const target = dominant ? DIAL_F * (Math.PI / 2 - baseAngle(idxOf(dominant))) : 0;
   // useFrame OWNS rotation.z (the JSX must NOT set rotation-z, or React would re-apply it
   // every render and the dial would snap instead of animating). First frame: snap to the
   // start; after that, ease toward the dominant via the shortest path and hold.
@@ -152,11 +153,24 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
   );
 }
 
-function Needle() {
-  // fixed at north (does NOT rotate with the dial)
+function Needle({ dominant }: { dominant: MacroNode | null }) {
+  // the needle swings to POINT at the current emotion (covers the part of the turn the dial
+  // doesn't), so picking a nearby emotion barely moves the wheel. Points north when idle.
+  const ref = useRef<THREE.Group>(null);
+  const inited = useRef(false);
+  const reduced = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
+  const target = dominant ? -(1 - DIAL_F) * (Math.PI / 2 - baseAngle(idxOf(dominant))) : 0;
+  useFrame((_, dt) => {
+    const g = ref.current; if (!g) return;
+    if (!inited.current) { g.rotation.z = target; inited.current = true; return; }
+    if (reduced) { g.rotation.z = target; return; }
+    let d = target - g.rotation.z;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    g.rotation.z += d * Math.min(1, dt * 2.4);
+  });
   const len = R * 0.86;
   return (
-    <group>
+    <group ref={ref}>
       {/* sleek round spire (was a 4-sided pyramid → squared) */}
       <mesh position={[0, len / 2, 0.3]}><coneGeometry args={[0.17, len, 24]} /><meshBasicMaterial color="#E8C36B" /></mesh>
       <mesh position={[0, R + 0.7, 0.3]}><sphereGeometry args={[0.26, 20, 20]} /><meshBasicMaterial color="#fff3d6" /></mesh>
@@ -178,7 +192,7 @@ export default function CompassScene({ dominant, moodColor, comprehension, trail
       <ambientLight intensity={0.6} />
       <group rotation-x={-1.0} position={[-2, 1.8, -2]} scale={0.9}>
         <Dial dominant={dominant} moodColor={moodColor} comprehension={comprehension} trail={trail} onSelect={onSelect} />
-        <Needle />
+        <Needle dominant={dominant} />
       </group>
       <EffectComposer>
         <Bloom intensity={0.7} luminanceThreshold={0.42} luminanceSmoothing={0.7} mipmapBlur />
