@@ -132,6 +132,25 @@ export default function SplitView() {
   const moodMacro = useMemo<MacroNode | null>(() => dominantOf(distribution) ?? currentEmotion, [distribution, currentEmotion]);
   const moodColor = moodMacro ? TAXONOMY[moodMacro].color : "#5a4d8a";
 
+  // subtle pointer parallax on the ambient aura (a fixed layer → zero layout impact): the
+  // background glow drifts opposite the cursor, so it reads as depth behind the wheel.
+  const auraRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    const onMove = (e: PointerEvent) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const nx = e.clientX / window.innerWidth - 0.5;
+        const ny = e.clientY / window.innerHeight - 0.5;
+        if (auraRef.current) auraRef.current.style.transform = `translate3d(${(-nx * 28).toFixed(1)}px, ${(-ny * 28).toFixed(1)}px, 0)`;
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    return () => { window.removeEventListener("pointermove", onMove); cancelAnimationFrame(raf); };
+  }, []);
+
   // keep refs in sync so the imperative triggers below read fresh values
   useEffect(() => { queueRef.current = queue; playingRef.current = queue.length > 0; }, [queue]);
   useEffect(() => { indexRef.current = index; }, [index]);
@@ -409,11 +428,13 @@ export default function SplitView() {
       {/* ambient mood aura — a fixed room glow that blooms in the dominant emotion's
           colour as you engage; invisible at rest. Sits behind everything (z-0). */}
       <div
+        ref={auraRef}
         aria-hidden
-        className="lyra-aura pointer-events-none fixed inset-0 z-0"
+        className="lyra-aura pointer-events-none fixed -inset-16 z-0"
         style={{
           background: `radial-gradient(70% 55% at 50% 42%, ${moodColor}, transparent 68%)`,
           opacity: Math.round(comprehension * 22) / 100,
+          willChange: "transform",
         }}
       />
       <audio
@@ -433,7 +454,7 @@ export default function SplitView() {
         <div className="absolute right-4 top-4 z-30">{settingsBtn}</div>
         {/* the wheel builds its shape in the background — also the scroll/swipe skip surface */}
         <div
-          className="pointer-events-auto absolute left-1/2 top-[34%] aspect-square w-[150vw] max-w-[600px] -translate-x-1/2 -translate-y-1/2 opacity-70"
+          className="pointer-events-auto absolute left-1/2 top-[34%] aspect-square w-[124vw] max-w-[480px] -translate-x-1/2 -translate-y-1/2 opacity-70"
           onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         >
           <div className="lyra-breathe h-full w-full">

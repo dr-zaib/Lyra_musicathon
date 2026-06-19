@@ -70,8 +70,11 @@ export default function EmotionWheel({
     const start = performance.now();
     let raf = 0;
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / 600);
-      const e = 1 - Math.pow(1 - t, 3);
+      const t = Math.min(1, (now - start) / 640);
+      // easeOutBack — a gentle overshoot so the shape springs into place instead of
+      // easing in flatly (a "settle" with a tiny bounce). c1 small = subtle.
+      const c1 = 1.15, p = t - 1;
+      const e = 1 + (c1 + 1) * p * p * p + c1 * p * p;
       const cur: Partial<Record<MacroNode, number>> = {};
       for (const k of keys) cur[k] = (from[k] ?? 0) + ((to[k] ?? 0) - (from[k] ?? 0)) * e;
       setDisp(cur);
@@ -138,6 +141,12 @@ export default function EmotionWheel({
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        {/* the radar glows from the wheel centre outward, instead of a flat fill */}
+        <radialGradient id="lw-radar" gradientUnits="userSpaceOnUse" cx={CX} cy={CY} r={rd(R * 0.72)}>
+          <stop offset="0%" stopColor={coreColor} stopOpacity={0.95} />
+          <stop offset="68%" stopColor={coreColor} stopOpacity={0.4} />
+          <stop offset="100%" stopColor={coreColor} stopOpacity={0.12} />
+        </radialGradient>
       </defs>
 
       {/* the breathing core — empty middle gets a soft orb that grows + warms with picks */}
@@ -155,7 +164,7 @@ export default function EmotionWheel({
       {shape && radar && (
         <polygon
           points={radar.points}
-          fill={radar.color} fillOpacity={rd((0.08 + comprehension * 0.16) * (faintShape ? 0.4 : 1))}
+          fill="url(#lw-radar)" fillOpacity={rd((0.16 + comprehension * 0.22) * (faintShape ? 0.4 : 1))}
           stroke={radar.color} strokeOpacity={rd((0.3 + comprehension * 0.4) * (faintShape ? 0.5 : 1))} strokeWidth={faintShape ? 0.6 : 0.8} strokeLinejoin="round"
           filter="url(#lw-glow)"
           style={{ transition: "fill .4s ease, stroke .4s ease, fill-opacity .5s ease, stroke-opacity .5s ease" }}
