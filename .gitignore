@@ -11,3 +11,9 @@ __pycache__/
 node_modules/
 .next/
 .env.local
+
+# local tooling + scratch artifacts (preview config, headless screenshots, mockups, logs)
+.claude/
+web/_*.png
+web/_*.html
+web/*.log

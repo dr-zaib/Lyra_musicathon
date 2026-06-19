@@ -31,6 +31,20 @@ function at(i: number, radius: number) {
   return { x: rd(CX + radius * Math.cos(a)), y: rd(CY - radius * Math.sin(a)) };
 }
 
+// closed Catmull-Rom → cubic bézier: turns the 12 radar points into one smooth, organic
+// outline (no jagged "broken line" between non-adjacent spikes).
+function smoothClosed(p: { x: number; y: number }[]): string {
+  const n = p.length;
+  let d = `M ${p[0].x},${p[0].y}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = p[(i - 1 + n) % n], p1 = p[i], p2 = p[(i + 1) % n], p3 = p[(i + 2) % n];
+    const c1x = rd(p1.x + (p2.x - p0.x) / 6), c1y = rd(p1.y + (p2.y - p0.y) / 6);
+    const c2x = rd(p2.x - (p3.x - p1.x) / 6), c2y = rd(p2.y - (p3.y - p1.y) / 6);
+    d += ` C ${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`;
+  }
+  return d + " Z";
+}
+
 export default function EmotionWheel({
   distribution,
   comprehension = 0,
@@ -71,7 +85,7 @@ export default function EmotionWheel({
     let raf = 0;
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / 600);
-      const e = 1 - Math.pow(1 - t, 3);
+      const e = 1 - Math.pow(1 - t, 3); // smooth ease-out, no overshoot
       const cur: Partial<Record<MacroNode, number>> = {};
       for (const k of keys) cur[k] = (from[k] ?? 0) + ((to[k] ?? 0) - (from[k] ?? 0)) * e;
       setDisp(cur);
@@ -106,30 +120,75 @@ export default function EmotionWheel({
   // by its weight (floor keeps a small core). One mood → a rhombus/arrow at it.
   const radar = useMemo(() => {
     if (!disp) return null;
-    const ws = WHEEL_ORDER.map((n) => disp[n] ?? 0);
-    const maxW = Math.max(...ws, 0.0001);
+    const n = WHEEL_ORDER.length;
+    const ws = WHEEL_ORDER.map((m) => disp[m] ?? 0);
     const dom = WHEEL_ORDER[ws.indexOf(Math.max(...ws))];
-    const points = WHEEL_ORDER.map((n, i) => {
-      const p = at(i, R * (0.15 + 0.85 * ((disp[n] ?? 0) / maxW)));
-      return `${p.x},${p.y}`;
-    }).join(" ");
-    return { points, color: TAXONOMY[dom].color };
+    // each node's radius is a smooth "field": its own weight plus spill from neighbours
+    // (gaussian over circular distance). The outline bulges toward the picks and rounds
+    // out between them — a high floor keeps a full body so it never collapses inward.
+    const SIGMA = 0.78; // spill width, in node-steps
+    const field = WHEEL_ORDER.map((_, i) => {
+      let f = 0;
+      for (let j = 0; j < n; j++) {
+        const dd = Math.min(Math.abs(i - j), n - Math.abs(i - j)); // circular distance
+        f += ws[j] * Math.exp(-(dd * dd) / (2 * SIGMA * SIGMA));
+      }
+      return f;
+    });
+    const maxF = Math.max(...field, 0.0001);
+    const FLOOR = 0.26, SPAN = 0.74; // dominant → the ring; the far side tapers in (directional) but never to a point
+    const pts = WHEEL_ORDER.map((_, i) => at(i, R * (FLOOR + SPAN * (field[i] / maxF))));
+    return { d: smoothClosed(pts), color: TAXONOMY[dom].color };
   }, [disp]);
+
+  // the centre "core" — a soft breathing orb that gives the empty middle some life and
+  // warms toward the dominant emotion as picks accumulate (violet at rest).
+  const coreColor = radar?.color ?? "#7a6ad6";
 
   const interactive = !!onSelect;
 
   return (
-    <svg viewBox={big ? "-10 -10 120 120" : "-16 -16 132 132"} className="h-full w-full" role="img" aria-label="emotional wheel">
+    <svg viewBox={big ? "-7 -7 114 114" : "-16 -16 132 132"} className="h-full w-full" role="img" aria-label="emotional wheel">
+      {/* shared decorative defs: the core's radial glow + a soft blur for the radar */}
+      <defs>
+        <radialGradient id="lw-core" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={coreColor} stopOpacity={0.82} />
+          <stop offset="48%" stopColor={coreColor} stopOpacity={0.28} />
+          <stop offset="100%" stopColor={coreColor} stopOpacity={0} />
+        </radialGradient>
+        <filter id="lw-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation={faintShape ? 0.6 : 0.9} result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        {/* the radar glows from the wheel centre outward, instead of a flat fill */}
+        <radialGradient id="lw-radar" gradientUnits="userSpaceOnUse" cx={CX} cy={CY} r={rd(R * 0.72)}>
+          <stop offset="0%" stopColor={coreColor} stopOpacity={0.95} />
+          <stop offset="68%" stopColor={coreColor} stopOpacity={0.4} />
+          <stop offset="100%" stopColor={coreColor} stopOpacity={0.12} />
+        </radialGradient>
+      </defs>
+
+      {/* the breathing core — empty middle gets a soft orb that grows + warms with picks */}
+      {shape && (
+        <g style={{ opacity: rd((0.72 + comprehension * 0.28) * (faintShape ? 0.7 : 1)), transition: "opacity .6s ease" }} pointerEvents="none">
+          <circle className="lyra-core" cx={CX} cy={CY} r={rd(R * 0.9)} fill="url(#lw-core)" />
+        </g>
+      )}
+
       <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--border)" strokeWidth={0.4} />
       <circle cx={CX} cy={CY} r={R * 0.4} fill="none" stroke="var(--border)" strokeWidth={0.3} />
 
       {/* the directional graph — one cohesive angular shape that morphs as moods accumulate;
           confidence controls its sharpness (faint when unsure, crisp when confident) */}
       {shape && radar && (
-        <polygon
-          points={radar.points}
-          fill={radar.color} fillOpacity={rd((0.08 + comprehension * 0.16) * (faintShape ? 0.4 : 1))}
+        <path
+          d={radar.d}
+          fill="url(#lw-radar)" fillOpacity={rd((0.16 + comprehension * 0.22) * (faintShape ? 0.4 : 1))}
           stroke={radar.color} strokeOpacity={rd((0.3 + comprehension * 0.4) * (faintShape ? 0.5 : 1))} strokeWidth={faintShape ? 0.6 : 0.8} strokeLinejoin="round"
+          filter="url(#lw-glow)"
           style={{ transition: "fill .4s ease, stroke .4s ease, fill-opacity .5s ease, stroke-opacity .5s ease" }}
         />
       )}

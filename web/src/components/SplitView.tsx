@@ -17,6 +17,7 @@ import EmotionWheel from "./EmotionWheel";
 import PlayerBar from "./PlayerBar";
 import PlaylistView from "./PlaylistView";
 import Settings, { type PlaybackSettings, defaultLanguage } from "./Settings";
+import { TAXONOMY } from "@/lib/taxonomy";
 import type {
   AgentTurn,
   EntryResponse,
@@ -101,7 +102,6 @@ export default function SplitView() {
   const [messages, setMessages] = useState<Msg[]>([]); // empty: the cold hero is the prompt, the feed fills with real turns
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
-  const [building, setBuilding] = useState(false); // a journey is (re)generating
   const [showSkipHint, setShowSkipHint] = useState(false);
   const skipHintDone = useRef(false);
 
@@ -125,10 +125,48 @@ export default function SplitView() {
   const current = queue[index] ?? null;
   const currentEmotion = useMemo<MacroNode | null>(() => (current ? dominantOf(current.track.distribution) : null), [current]);
 
+  // ambient mood aura: the room glows toward the dominant emotion as picks accumulate
+  // (invisible at rest, warm when engaged). Colour from the picks, fallback to the
+  // current track's mood, then a soft violet.
+  const moodMacro = useMemo<MacroNode | null>(() => dominantOf(distribution) ?? currentEmotion, [distribution, currentEmotion]);
+  const moodColor = moodMacro ? TAXONOMY[moodMacro].color : "#5a4d8a";
+
+  // subtle pointer parallax on the ambient aura (a fixed layer → zero layout impact): the
+  // background glow drifts opposite the cursor, so it reads as depth behind the wheel.
+  const auraRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    const onMove = (e: PointerEvent) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const nx = e.clientX / window.innerWidth - 0.5;
+        const ny = e.clientY / window.innerHeight - 0.5;
+        if (auraRef.current) auraRef.current.style.transform = `translate3d(${(-nx * 28).toFixed(1)}px, ${(-ny * 28).toFixed(1)}px, 0)`;
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    return () => { window.removeEventListener("pointermove", onMove); cancelAnimationFrame(raf); };
+  }, []);
+
   // keep refs in sync so the imperative triggers below read fresh values
   useEffect(() => { queueRef.current = queue; playingRef.current = queue.length > 0; }, [queue]);
   useEffect(() => { indexRef.current = index; }, [index]);
   useEffect(() => { picksRef.current = picks; }, [picks]);
+
+  // dev/demo: ?picks=Anger,Hope,Reflection seeds the wheel SHAPE only (no playback / no
+  // network) so any wheel state can be captured deterministically for screenshots + the
+  // 90s video. Inert without the param.
+  /* eslint-disable react-hooks/set-state-in-effect -- one-shot mount seed from the URL */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search).get("picks");
+    if (!p) return;
+    const seed = p.split(",").map((s) => s.trim()).filter(Boolean) as MacroNode[];
+    if (seed.length) { picksRef.current = seed.slice(0, MAX_PICKS); setPicks(seed.slice(0, MAX_PICKS)); }
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // play the current track + narrate it into the feed
   /* eslint-disable react-hooks/set-state-in-effect -- syncing the <audio> element + narration */
@@ -184,6 +222,21 @@ export default function SplitView() {
     );
   }, [settings.knownNew, settings.language, settings.skipMode]);
 
+  // dev/demo: ?picks=…&play=1 also kicks off playback (mock fallback) so the PLAYING
+  // layout (player bar visible) can be captured for screenshots + the video. Inert otherwise.
+  const seededPlay = useRef(false);
+  /* eslint-disable react-hooks/set-state-in-effect -- one-shot dev/demo playback trigger from the URL */
+  useEffect(() => {
+    if (typeof window === "undefined" || seededPlay.current) return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("play") !== "1") return;
+    const p = sp.get("picks");
+    const seed = (p ? p.split(",").map((s) => s.trim()).filter(Boolean) : []) as MacroNode[];
+    seededPlay.current = true;
+    startPlayback(seed.slice(0, MAX_PICKS));
+  }, [startPlayback]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const refill = useCallback(async () => {
     try {
       const remaining = queueRef.current.slice(indexRef.current).map((q) => q.track);
@@ -202,10 +255,9 @@ export default function SplitView() {
 
   // rebuild the UPCOMING queue (new mood/mode) WITHOUT touching the current track.
   // It plays out (or the user skips); the new-mood tracks queue behind it. Progressive.
-  const rebuildTail = useCallback(async (forPicks: MacroNode[], shape: TrajectoryShape, silent = false) => {
+  const rebuildTail = useCallback(async (forPicks: MacroNode[], shape: TrajectoryShape) => {
     const seedMood = dominantOf(freqDistribution(forPicks));
     if (!seedMood) return;
-    if (!silent) setBuilding(true);
     let traj: Trajectory;
     try {
       const body: JourneyRequest = { seed_mood: seedMood, shape, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current };
@@ -217,17 +269,15 @@ export default function SplitView() {
       if (!res.ok) throw new Error(`journey ${res.status}`);
       traj = await res.json();
     } catch {
-      setBuilding(false);
       return;
     }
     const at = indexRef.current;
     const curId = queueRef.current[at]?.track.track_id;
     const steps = traj.steps.filter((s) => s.selected_track.track_id !== curId);
-    if (!steps.length) { setBuilding(false); return; }
+    if (!steps.length) return;
     const first = steps[0];
     const firstItem: QueueItem = { track: await enrichTrack(first.selected_track), verse: first.citable_verse ?? null, reason: first.transition_reason ?? null };
     setQueue((q) => [...q.slice(0, at + 1), firstItem]); // keep [0..current], replace the tail
-    setBuilding(false);
     if (steps.length > 1) {
       Promise.all(
         steps.slice(1).map(async (s) => ({ track: await enrichTrack(s.selected_track), verse: s.citable_verse ?? null, reason: s.transition_reason ?? null })),
@@ -307,7 +357,7 @@ export default function SplitView() {
     // hide the gen time: near the entry track's end, auto-build the journey (silent)
     if (!autoGenFired.current && playingRef.current && duration > 0 && duration - t <= 8) {
       autoGenFired.current = true;
-      rebuildTail(picksRef.current, modeRef.current, true);
+      rebuildTail(picksRef.current, modeRef.current);
     }
   };
 
@@ -317,7 +367,7 @@ export default function SplitView() {
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     picksRef.current = []; modeRef.current = "deepen";
     setMessages([]);
-    setPicks([]); setMode("deepen"); setPending(false); setBuilding(false); setShowSkipHint(false);
+    setPicks([]); setMode("deepen"); setPending(false); setShowSkipHint(false);
     setQueue([]); setIndex(0); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
@@ -348,7 +398,7 @@ export default function SplitView() {
 
   const convoProps = {
     messages, comprehension,
-    playing, pending, building, mode,
+    playing, pending, mode,
     draft, setDraft, onSubmit: submit,
     onExample: (text: string) => submitText(text),
     onSurprise: surprise,
@@ -384,8 +434,38 @@ export default function SplitView() {
     <button onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-muted transition hover:bg-bg-elev hover:text-fg">⚙</button>
   );
 
+  // a dimmed player skeleton shown (desktop) before anything plays — so the reserved bottom
+  // strip reads as "the player appears here", not empty wasted space (Spotify-style idle bar).
+  const playerPlaceholder = (
+    <div aria-hidden className="border-t border-border bg-bg-elev/35 backdrop-blur-sm">
+      <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4">
+        <div className="flex items-center gap-3 opacity-50">
+          <span className="h-14 w-14 shrink-0 rounded-md bg-bg-elev-2" />
+          <div className="space-y-1.5">
+            <span className="block h-2.5 w-28 rounded-full bg-bg-elev-2" />
+            <span className="block h-2 w-20 rounded-full bg-bg-elev-2" />
+          </div>
+        </div>
+        <span className="flex h-12 w-12 items-center justify-center rounded-full border border-border text-base text-muted-2 opacity-50">▶</span>
+        <span />
+      </div>
+    </div>
+  );
+
   return (
     <div className="relative z-10">
+      {/* ambient mood aura — a fixed room glow that blooms in the dominant emotion's
+          colour as you engage; invisible at rest. Sits behind everything (z-0). */}
+      <div
+        ref={auraRef}
+        aria-hidden
+        className="lyra-aura pointer-events-none fixed -inset-16 z-0"
+        style={{
+          background: `radial-gradient(70% 55% at 50% 42%, ${moodColor}, transparent 68%)`,
+          opacity: Math.round(comprehension * 22) / 100,
+          willChange: "transform",
+        }}
+      />
       <audio
         ref={audioRef}
         onTimeUpdate={(e) => onTimeUpdate(e.currentTarget.currentTime)}
@@ -403,7 +483,7 @@ export default function SplitView() {
         <div className="absolute right-4 top-4 z-30">{settingsBtn}</div>
         {/* the wheel builds its shape in the background — also the scroll/swipe skip surface */}
         <div
-          className="pointer-events-auto absolute left-1/2 top-[34%] aspect-square w-[150vw] max-w-[600px] -translate-x-1/2 -translate-y-1/2 opacity-70"
+          className="pointer-events-auto absolute left-1/2 top-[34%] aspect-square w-[124vw] max-w-[480px] -translate-x-1/2 -translate-y-1/2 opacity-70"
           onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         >
           <div className="lyra-breathe h-full w-full">
@@ -435,32 +515,39 @@ export default function SplitView() {
       </div>
 
       {/* ===== DESKTOP ===== */}
-      <div className="hidden h-screen flex-col md:flex">
+      <div className="relative hidden h-screen flex-col md:flex">
         {/* page header — title on the left, settings pinned top-right of the whole page */}
         <header className="flex shrink-0 items-baseline gap-3 pl-7 pr-16 pt-5">
           <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
           <span className="text-xs text-muted">the lyrics layer for your player</span>
           <div className="ml-auto">{settingsBtn}</div>
         </header>
-        <main className="flex w-full flex-1 items-stretch gap-6 overflow-hidden pl-7 pr-16 pb-6 pt-3">
+        {/* main RESERVES the player's strip at the bottom at all times (pb-[104px]), so its
+            content area is a constant height — the wheel is sized by that area and never
+            resizes when the player appears/disappears. The player is an absolute overlay
+            that sits over the reserved strip (so it never pushes or covers content). */}
+        <main className="flex w-full flex-1 items-stretch gap-6 overflow-hidden pl-7 pr-16 pb-[104px] pt-2">
           {/* LEFT — the wheel. Sized ONLY by the column height (max-h below): it does NOT
-              depend on the margins or the panel width, so changing those never resizes the
-              ring. To resize the wheel, change ONE number → max-h-[…]. */}
+              depend on the margins, panel width, or the player. To resize it, change ONE
+              number → max-h-[…]. The pips get their own row beneath it (clear of the ring). */}
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-            <div className="flex flex-1 items-center justify-center pb-7">
-              <div className="relative aspect-square h-full max-h-[860px] -translate-y-[2.5%]">
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <div className="relative aspect-square h-full max-h-[900px]">
                 <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
-                <div className="pointer-events-none absolute inset-x-0 bottom-[5%] flex justify-center">{pips}</div>
               </div>
             </div>
+            <div className="flex shrink-0 justify-center pt-3 pb-1">{pips}</div>
           </section>
           {/* RIGHT — the chat panel. Fixed width, independent of the wheel. To resize it,
               change ONE number → w-[…]. */}
-          <section className="mb-2 mt-3 flex w-[440px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
+          <section className="mb-2 mt-2 flex w-[440px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
             <ConversationPanel variant="panel" {...convoProps} />
           </section>
         </main>
-        {player}
+        {/* bottom strip — the real player when playing, a dimmed skeleton otherwise */}
+        {player
+          ? <div className="absolute inset-x-0 bottom-0 z-30">{player}</div>
+          : <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">{playerPlaceholder}</div>}
       </div>
     </div>
   );

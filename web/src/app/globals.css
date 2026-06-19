@@ -82,6 +82,23 @@ body::before {
   animation: fade-up 0.4s ease both;
 }
 
+/* ambient mood aura: smooth crossfade as the dominant emotion (colour) + engagement
+   (opacity) change. Behind everything; honours reduced motion via the global rule. */
+.lyra-aura {
+  transition: opacity 1s ease, background 1.1s ease;
+}
+
+/* the wheel's centre core: a slow breathing orb (scale only — opacity is React-driven) */
+@keyframes lyra-core {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+.lyra-core {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lyra-core 6s ease-in-out infinite;
+}
+
 /* living-background wheel: slow breathing */
 @keyframes lyra-breathe {
   0%,
