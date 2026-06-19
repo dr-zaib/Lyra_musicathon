@@ -148,7 +148,7 @@ export default function EmotionWheel({
   const interactive = !!onSelect;
 
   return (
-    <svg viewBox={big ? "-10 -10 120 120" : "-16 -16 132 132"} className="h-full w-full" role="img" aria-label="emotional wheel">
+    <svg viewBox={big ? "-7 -7 114 114" : "-16 -16 132 132"} className="h-full w-full" role="img" aria-label="emotional wheel">
       {/* shared decorative defs: the core's radial glow + a soft blur for the radar */}
       <defs>
         <radialGradient id="lw-core" cx="50%" cy="50%" r="50%">

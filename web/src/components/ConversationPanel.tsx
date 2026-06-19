@@ -99,7 +99,7 @@ export default function ConversationPanel({
         {cold ? (
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: "easeOut" }}
-            className={`flex h-full flex-col text-center ${floating ? "justify-start pt-[19vh]" : "justify-center pt-[8vh]"}`}
+            className={`flex h-full flex-col text-center ${floating ? "justify-start pt-[19vh]" : "justify-start pt-[7vh]"}`}
           >
             <h1 className="font-display text-[1.7rem] font-medium lowercase leading-[1.15] tracking-tight text-fg">tell lyra your mood,<br />get a playlist.</h1>
             <p className="mx-auto mt-2 max-w-[20rem] text-sm text-muted">{floating ? "three emotions — just tell me how you feel." : "three emotions — type them, or tap them on the wheel."}</p>

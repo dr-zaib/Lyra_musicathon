@@ -434,6 +434,24 @@ export default function SplitView() {
     <button onClick={() => setSettingsOpen(true)} aria-label="settings" title="settings" className="flex h-10 w-10 items-center justify-center rounded-full text-lg text-muted transition hover:bg-bg-elev hover:text-fg">⚙</button>
   );
 
+  // a dimmed player skeleton shown (desktop) before anything plays — so the reserved bottom
+  // strip reads as "the player appears here", not empty wasted space (Spotify-style idle bar).
+  const playerPlaceholder = (
+    <div aria-hidden className="border-t border-border bg-bg-elev/35 backdrop-blur-sm">
+      <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-3.5">
+        <div className="flex items-center gap-3 opacity-50">
+          <span className="h-12 w-12 shrink-0 rounded-md bg-bg-elev-2" />
+          <div className="space-y-1.5">
+            <span className="block h-2.5 w-28 rounded-full bg-bg-elev-2" />
+            <span className="block h-2 w-20 rounded-full bg-bg-elev-2" />
+          </div>
+        </div>
+        <span className="flex h-12 w-12 items-center justify-center rounded-full border border-border text-base text-muted-2 opacity-50">▶</span>
+        <span />
+      </div>
+    </div>
+  );
+
   return (
     <div className="relative z-10">
       {/* ambient mood aura — a fixed room glow that blooms in the dominant emotion's
@@ -508,25 +526,28 @@ export default function SplitView() {
             content area is a constant height — the wheel is sized by that area and never
             resizes when the player appears/disappears. The player is an absolute overlay
             that sits over the reserved strip (so it never pushes or covers content). */}
-        <main className="flex w-full flex-1 items-stretch gap-6 overflow-hidden pl-7 pr-16 pb-[104px] pt-3">
+        <main className="flex w-full flex-1 items-stretch gap-6 overflow-hidden pl-7 pr-16 pb-[88px] pt-2">
           {/* LEFT — the wheel. Sized ONLY by the column height (max-h below): it does NOT
               depend on the margins, panel width, or the player. To resize it, change ONE
               number → max-h-[…]. The pips get their own row beneath it (clear of the ring). */}
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="flex min-h-0 flex-1 items-center justify-center">
-              <div className="relative aspect-square h-full max-h-[760px]">
+              <div className="relative aspect-square h-full max-h-[900px]">
                 <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
               </div>
             </div>
-            <div className="flex shrink-0 justify-center pt-5 pb-1">{pips}</div>
+            <div className="flex shrink-0 justify-center pt-3 pb-1">{pips}</div>
           </section>
           {/* RIGHT — the chat panel. Fixed width, independent of the wheel. To resize it,
               change ONE number → w-[…]. */}
-          <section className="mb-2 mt-3 flex w-[440px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
+          <section className="mb-2 mt-2 flex w-[440px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
             <ConversationPanel variant="panel" {...convoProps} />
           </section>
         </main>
-        {player && <div className="absolute inset-x-0 bottom-0 z-30">{player}</div>}
+        {/* bottom strip — the real player when playing, a dimmed skeleton otherwise */}
+        {player
+          ? <div className="absolute inset-x-0 bottom-0 z-30">{player}</div>
+          : <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">{playerPlaceholder}</div>}
       </div>
     </div>
   );
