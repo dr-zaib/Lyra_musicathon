@@ -446,10 +446,10 @@ export default function SplitView() {
           <section className="flex w-1/2 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             {/* wheel stays centered; pips are absolutely positioned just below the ring so
                 nudging them never shifts the wheel */}
-            <div className="flex flex-1 items-center justify-center">
+            <div className="flex flex-1 items-center justify-center pb-7">
               <div className="relative aspect-square w-full max-w-[560px]">
                 <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
-                <div className="pointer-events-none absolute inset-x-0 bottom-[13%] flex justify-center">{pips}</div>
+                <div className="pointer-events-none absolute inset-x-0 bottom-[5%] flex justify-center">{pips}</div>
               </div>
             </div>
           </section>
