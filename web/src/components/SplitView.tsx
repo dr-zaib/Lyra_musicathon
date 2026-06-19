@@ -543,7 +543,7 @@ export default function SplitView() {
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="flex min-h-0 flex-1 items-center justify-center">
               {compassMode ? (
-                <div className="h-full w-full"><CompassScene /></div>
+                <div className="h-full w-full"><CompassScene dominant={moodMacro} moodColor={moodColor} comprehension={comprehension} picks={picks} /></div>
               ) : (
                 <div className="relative aspect-square h-full max-h-[900px]">
                   <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
