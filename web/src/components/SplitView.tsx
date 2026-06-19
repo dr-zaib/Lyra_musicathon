@@ -440,18 +440,20 @@ export default function SplitView() {
         <header className="flex shrink-0 items-baseline gap-3 px-7 pt-5">
           <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
           <span className="text-xs text-muted">the lyrics layer for your player</span>
-          <div className="ml-auto">{settingsBtn}</div>
+          <div className="ml-auto pr-4">{settingsBtn}</div>
         </header>
         <main className="flex w-full flex-1 gap-6 overflow-hidden px-7 pb-6 pt-3">
           <section className="flex w-1/2 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-            <div className="flex flex-1 flex-col items-center justify-center gap-1">
-              <div className="aspect-square w-full max-w-[560px]">
+            {/* wheel stays centered; pips are absolutely positioned just below the ring so
+                nudging them never shifts the wheel */}
+            <div className="flex flex-1 items-center justify-center">
+              <div className="relative aspect-square w-full max-w-[560px]">
                 <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
+                <div className="pointer-events-none absolute inset-x-0 bottom-[13%] flex justify-center">{pips}</div>
               </div>
-              <div className="-mt-4">{pips}</div>
             </div>
           </section>
-          <section className="mb-2 mr-2 mt-3 flex w-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
+          <section className="mb-2 mr-4 mt-3 flex w-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
             <ConversationPanel variant="panel" {...convoProps} />
           </section>
         </main>
