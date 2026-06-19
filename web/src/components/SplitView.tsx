@@ -223,6 +223,21 @@ export default function SplitView() {
     );
   }, [settings.knownNew, settings.language, settings.skipMode]);
 
+  // dev/demo: ?picks=…&play=1 also kicks off playback (mock fallback) so the PLAYING
+  // layout (player bar visible) can be captured for screenshots + the video. Inert otherwise.
+  const seededPlay = useRef(false);
+  /* eslint-disable react-hooks/set-state-in-effect -- one-shot dev/demo playback trigger from the URL */
+  useEffect(() => {
+    if (typeof window === "undefined" || seededPlay.current) return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("play") !== "1") return;
+    const p = sp.get("picks");
+    const seed = (p ? p.split(",").map((s) => s.trim()).filter(Boolean) : []) as MacroNode[];
+    seededPlay.current = true;
+    startPlayback(seed.slice(0, MAX_PICKS));
+  }, [startPlayback]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const refill = useCallback(async () => {
     try {
       const remaining = queueRef.current.slice(indexRef.current).map((q) => q.track);
@@ -486,24 +501,28 @@ export default function SplitView() {
       </div>
 
       {/* ===== DESKTOP ===== */}
-      <div className="hidden h-screen flex-col md:flex">
+      <div className="relative hidden h-screen flex-col md:flex">
         {/* page header — title on the left, settings pinned top-right of the whole page */}
         <header className="flex shrink-0 items-baseline gap-3 pl-7 pr-16 pt-5">
           <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
           <span className="text-xs text-muted">the lyrics layer for your player</span>
           <div className="ml-auto">{settingsBtn}</div>
         </header>
-        <main className="flex w-full flex-1 items-stretch gap-6 overflow-hidden pl-7 pr-16 pb-6 pt-3">
+        {/* main RESERVES the player's strip at the bottom at all times (pb-[104px]), so its
+            content area is a constant height — the wheel is sized by that area and never
+            resizes when the player appears/disappears. The player is an absolute overlay
+            that sits over the reserved strip (so it never pushes or covers content). */}
+        <main className="flex w-full flex-1 items-stretch gap-6 overflow-hidden pl-7 pr-16 pb-[104px] pt-3">
           {/* LEFT — the wheel. Sized ONLY by the column height (max-h below): it does NOT
-              depend on the margins or the panel width, so changing those never resizes the
-              ring. To resize the wheel, change ONE number → max-h-[…]. */}
+              depend on the margins, panel width, or the player. To resize it, change ONE
+              number → max-h-[…]. The pips get their own row beneath it (clear of the ring). */}
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-            <div className="flex flex-1 items-center justify-center pb-7">
-              <div className="relative aspect-square h-full max-h-[860px] -translate-y-[2.5%]">
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <div className="relative aspect-square h-full max-h-[760px]">
                 <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
-                <div className="pointer-events-none absolute inset-x-0 bottom-[5%] flex justify-center">{pips}</div>
               </div>
             </div>
+            <div className="flex shrink-0 justify-center pt-5 pb-1">{pips}</div>
           </section>
           {/* RIGHT — the chat panel. Fixed width, independent of the wheel. To resize it,
               change ONE number → w-[…]. */}
@@ -511,7 +530,7 @@ export default function SplitView() {
             <ConversationPanel variant="panel" {...convoProps} />
           </section>
         </main>
-        {player}
+        {player && <div className="absolute inset-x-0 bottom-0 z-30">{player}</div>}
       </div>
     </div>
   );
