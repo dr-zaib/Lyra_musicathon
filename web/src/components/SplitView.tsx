@@ -93,7 +93,7 @@ export default function SplitView() {
   const [settings, setSettings] = useState<PlaybackSettings>(() => ({ knownNew: 0.5, skipMode: "scroll", language: defaultLanguage() }));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
-  const [compassMode, setCompassMode] = useState(false); // 3D compass view (flag: ?view=compass)
+  const [compassMode, setCompassMode] = useState(false); // 3D compass is the default view; ?view=2d falls back to the 2.5D wheel
   const [viewResolved, setViewResolved] = useState(false); // gate the left viz until the mode is known (no 2.5D flash)
 
   // emotions → wheel (FIFO buffer of the last 3 presses). The shape derives from this.
@@ -181,7 +181,10 @@ export default function SplitView() {
     if (seed.length) { picksRef.current = seed.slice(0, MAX_PICKS); setPicks(seed.slice(0, MAX_PICKS)); }
   }, []);
   useEffect(() => {
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "compass") setCompassMode(true);
+    if (typeof window !== "undefined") {
+      const v = new URLSearchParams(window.location.search).get("view");
+      setCompassMode(v !== "2d" && v !== "wheel"); // 3D compass is the DEFAULT; ?view=2d forces the 2.5D wheel (WebGL fallback)
+    }
     setViewResolved(true);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
