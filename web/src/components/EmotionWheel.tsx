@@ -31,6 +31,20 @@ function at(i: number, radius: number) {
   return { x: rd(CX + radius * Math.cos(a)), y: rd(CY - radius * Math.sin(a)) };
 }
 
+// closed Catmull-Rom → cubic bézier: turns the 12 radar points into one smooth, organic
+// outline (no jagged "broken line" between non-adjacent spikes).
+function smoothClosed(p: { x: number; y: number }[]): string {
+  const n = p.length;
+  let d = `M ${p[0].x},${p[0].y}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = p[(i - 1 + n) % n], p1 = p[i], p2 = p[(i + 1) % n], p3 = p[(i + 2) % n];
+    const c1x = rd(p1.x + (p2.x - p0.x) / 6), c1y = rd(p1.y + (p2.y - p0.y) / 6);
+    const c2x = rd(p2.x - (p3.x - p1.x) / 6), c2y = rd(p2.y - (p3.y - p1.y) / 6);
+    d += ` C ${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`;
+  }
+  return d + " Z";
+}
+
 export default function EmotionWheel({
   distribution,
   comprehension = 0,
@@ -106,14 +120,25 @@ export default function EmotionWheel({
   // by its weight (floor keeps a small core). One mood → a rhombus/arrow at it.
   const radar = useMemo(() => {
     if (!disp) return null;
-    const ws = WHEEL_ORDER.map((n) => disp[n] ?? 0);
-    const maxW = Math.max(...ws, 0.0001);
+    const n = WHEEL_ORDER.length;
+    const ws = WHEEL_ORDER.map((m) => disp[m] ?? 0);
     const dom = WHEEL_ORDER[ws.indexOf(Math.max(...ws))];
-    const points = WHEEL_ORDER.map((n, i) => {
-      const p = at(i, R * (0.15 + 0.85 * ((disp[n] ?? 0) / maxW)));
-      return `${p.x},${p.y}`;
-    }).join(" ");
-    return { points, color: TAXONOMY[dom].color };
+    // each node's radius is a smooth "field": its own weight plus spill from neighbours
+    // (gaussian over circular distance). The outline bulges toward the picks and rounds
+    // out between them — a high floor keeps a full body so it never collapses inward.
+    const SIGMA = 0.9; // spill width, in node-steps
+    const field = WHEEL_ORDER.map((_, i) => {
+      let f = 0;
+      for (let j = 0; j < n; j++) {
+        const dd = Math.min(Math.abs(i - j), n - Math.abs(i - j)); // circular distance
+        f += ws[j] * Math.exp(-(dd * dd) / (2 * SIGMA * SIGMA));
+      }
+      return f;
+    });
+    const maxF = Math.max(...field, 0.0001);
+    const FLOOR = 0.33, SPAN = 0.67; // dominant spike → the ring; valleys stay ≥ 0.33·R (no deep notch)
+    const pts = WHEEL_ORDER.map((_, i) => at(i, R * (FLOOR + SPAN * (field[i] / maxF))));
+    return { d: smoothClosed(pts), color: TAXONOMY[dom].color };
   }, [disp]);
 
   // the centre "core" — a soft breathing orb that gives the empty middle some life and
@@ -159,8 +184,8 @@ export default function EmotionWheel({
       {/* the directional graph — one cohesive angular shape that morphs as moods accumulate;
           confidence controls its sharpness (faint when unsure, crisp when confident) */}
       {shape && radar && (
-        <polygon
-          points={radar.points}
+        <path
+          d={radar.d}
           fill="url(#lw-radar)" fillOpacity={rd((0.16 + comprehension * 0.22) * (faintShape ? 0.4 : 1))}
           stroke={radar.color} strokeOpacity={rd((0.3 + comprehension * 0.4) * (faintShape ? 0.5 : 1))} strokeWidth={faintShape ? 0.6 : 0.8} strokeLinejoin="round"
           filter="url(#lw-glow)"
