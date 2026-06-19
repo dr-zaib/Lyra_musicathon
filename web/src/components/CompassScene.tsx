@@ -43,8 +43,8 @@ function Label({ text, color, position, big }: { text: string; color: string; po
   );
 }
 
-function Dial({ dominant, moodColor, comprehension, picks }: {
-  dominant: MacroNode | null; moodColor: string; comprehension: number; picks: MacroNode[];
+function Dial({ dominant, moodColor, comprehension, picks, onSelect }: {
+  dominant: MacroNode | null; moodColor: string; comprehension: number; picks: MacroNode[]; onSelect?: (m: MacroNode) => void;
 }) {
   const ref = useRef<THREE.Group>(null);
   const inited = useRef(false);
@@ -101,9 +101,17 @@ function Dial({ dominant, moodColor, comprehension, picks }: {
         const a = baseAngle(i); const x = Math.cos(a) * R, y = Math.sin(a) * R;
         const col = TAXONOMY[m].color;
         const isDom = m === dominant;
+        const interactive = !!onSelect;
         return (
-          <group key={m}>
+          <group
+            key={m}
+            onClick={interactive ? (e) => { e.stopPropagation(); onSelect!(m); } : undefined}
+            onPointerOver={interactive ? () => { document.body.style.cursor = "pointer"; } : undefined}
+            onPointerOut={interactive ? () => { document.body.style.cursor = ""; } : undefined}
+          >
             <mesh position={[x, y, 0.05]}><sphereGeometry args={[isDom ? 0.32 : 0.16, 16, 16]} /><meshBasicMaterial color={col} /></mesh>
+            {/* invisible but raycastable hit area for comfortable clicking */}
+            {interactive && <mesh position={[x * 1.1, y * 1.1, 0.4]}><sphereGeometry args={[1.3, 10, 10]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>}
             <Label text={m.toLowerCase()} color={col} position={[x * 1.13, y * 1.13, 0.4]} big={isDom} />
           </group>
         );
@@ -136,22 +144,20 @@ function Needle() {
   );
 }
 
-export default function CompassScene({ dominant, moodColor, comprehension, picks }: {
-  dominant: MacroNode | null; moodColor: string; comprehension: number; picks: MacroNode[];
+export default function CompassScene({ dominant, moodColor, comprehension, picks, onSelect }: {
+  dominant: MacroNode | null; moodColor: string; comprehension: number; picks: MacroNode[]; onSelect?: (m: MacroNode) => void;
 }) {
   return (
     <Canvas
       camera={{ position: [-3, 7, 23], fov: 50 }}
       onCreated={({ camera }) => camera.lookAt(-2, 0.5, -2)}
-      gl={{ antialias: true }}
+      gl={{ antialias: true, alpha: true }}
       dpr={[1, 2]}
-      style={{ width: "100%", height: "100%" }}
+      style={{ width: "100%", height: "100%", background: "transparent" }}
     >
-      <color attach="background" args={["#080611"]} />
-      <fogExp2 attach="fog" args={["#0a0716", 0.014]} />
       <ambientLight intensity={0.6} />
       <group rotation-x={-1.0} position={[-2, 0.5, -2]} scale={0.82}>
-        <Dial dominant={dominant} moodColor={moodColor} comprehension={comprehension} picks={picks} />
+        <Dial dominant={dominant} moodColor={moodColor} comprehension={comprehension} picks={picks} onSelect={onSelect} />
         <Needle />
       </group>
       <EffectComposer>

@@ -114,8 +114,9 @@ export default function ConversationPanel({
         {pending && <ThinkingIndicator floating={floating} />}
       </div>
 
-      {/* the input bar — the big "describe" box + the steer */}
-      <div className="shrink-0 space-y-2">
+      {/* the input bar — the big "describe" box + the steer. A hairline rule sets it apart
+          from the chat above (clear "this is the conversation / these are the controls"). */}
+      <div className="shrink-0 space-y-2 border-t border-border pt-3">
         {/* cold: example moods + surprise · playing: the steer pills (lit by mode) */}
         {!playing ? (
           <div className="space-y-2">
