@@ -210,13 +210,14 @@ export default function SplitView() {
   const startPlayback = useCallback(async (forPicks: MacroNode[], message?: string) => {
     setPending(true); autoGenFired.current = false; shownReason.current = null;
     modeRef.current = "deepen"; setMode("deepen");
-    const seedMood = dominantOf(freqDistribution(forPicks));
+    const seedDist = freqDistribution(forPicks);
+    const seedMood = dominantOf(seedDist);
     let data: EntryResponse;
     try {
       const res = await fetch("/api/entry", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message, seed_mood: seedMood, session_id: sessionId.current, known_new: settings.knownNew, language: settings.language }),
+        body: JSON.stringify({ message, seed_mood: seedMood, seed_distribution: seedDist, session_id: sessionId.current, known_new: settings.knownNew, language: settings.language }),
       });
       if (!res.ok) throw new Error(`entry ${res.status}`);
       data = await res.json();
@@ -274,11 +275,12 @@ export default function SplitView() {
   // rebuild the UPCOMING queue (new mood/mode) WITHOUT touching the current track.
   // It plays out (or the user skips); the new-mood tracks queue behind it. Progressive.
   const rebuildTail = useCallback(async (forPicks: MacroNode[], shape: TrajectoryShape) => {
-    const seedMood = dominantOf(freqDistribution(forPicks));
+    const seedDist = freqDistribution(forPicks);
+    const seedMood = dominantOf(seedDist);
     if (!seedMood) return;
     let traj: Trajectory;
     try {
-      const body: JourneyRequest = { seed_mood: seedMood, shape, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current };
+      const body: JourneyRequest = { seed_mood: seedMood, seed_distribution: seedDist, shape, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current };
       const res = await fetch("/api/journey", {
         method: "POST",
         headers: { "content-type": "application/json" },

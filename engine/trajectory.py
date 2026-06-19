@@ -103,6 +103,15 @@ def _normalize(v: np.ndarray) -> np.ndarray:
     return v / s if s > 0 else np.full(len(NODE_NAMES), 1.0 / len(NODE_NAMES))
 
 
+def _dist_to_vec(distribution: dict | None) -> np.ndarray | None:
+    """A normalized node vector from an intent distribution dict (≤3 weighted
+    nodes), or None when absent/empty so callers fall back to `_soft_start`."""
+    if not distribution:
+        return None
+    v = np.array([float(distribution.get(n, 0.0)) for n in NODE_NAMES])
+    return _normalize(v) if v.sum() > 0 else None
+
+
 def _to_dict(v: np.ndarray) -> dict[str, float]:
     return {NODE_NAMES[i]: float(v[i]) for i in range(len(NODE_NAMES))}
 
@@ -120,9 +129,13 @@ def _interp(start: np.ndarray, end: np.ndarray, n: int) -> list[np.ndarray]:
 
 
 def operator_targets(shape: str, seed: str, n_steps: int,
-                     end_node: str | None = None) -> tuple[np.ndarray, list[np.ndarray]]:
-    """Return (start_distribution, [target per step]) for a trajectory shape."""
-    start = _soft_start(seed)
+                     end_node: str | None = None,
+                     start_dist: np.ndarray | None = None) -> tuple[np.ndarray, list[np.ndarray]]:
+    """Return (start_distribution, [target per step]) for a trajectory shape.
+    `start_dist` (the user's full ≤3-node weighted read) overrides the single-seed
+    `_soft_start` as the journey's starting point; `seed` (the dominant) still
+    anchors the destination (deepen→seed, evolve→default_destination(seed))."""
+    start = start_dist if start_dist is not None else _soft_start(seed)
     if shape == "deepen":
         # reduce entropy: converge onto the seed node
         return start, _interp(start, _onehot(seed), n_steps)
@@ -417,11 +430,12 @@ def _serendipity_picks(n, used, banned_artists, banned_isrcs, go_to) -> list[tup
     return picks
 
 
-def _targeted_picks(seed_mood, shape, n, end_node, used, banned_artists, banned_isrcs) -> list[tuple]:
+def _targeted_picks(seed_mood, shape, n, end_node, used, banned_artists, banned_isrcs,
+                    start_dist=None) -> list[tuple]:
     """The aimed part of the journey: n steps toward the operator's targets."""
     if n <= 0:
         return []
-    _, targets = operator_targets(shape, seed_mood, n, end_node)
+    _, targets = operator_targets(shape, seed_mood, n, end_node, start_dist)
     with ThreadPoolExecutor(max_workers=min(8, len(targets) or 1)) as ex:
         cand_lists = list(ex.map(_fetch_candidates, targets))
     softmap.prewarm(_all_labels(cand_lists))
@@ -590,20 +604,25 @@ def refill_candidates(remaining: list[dict], exclude_isrcs: list[str] | None = N
 
 def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
                      end_node: str | None = None, shuffle: float = 0.0,
-                     exclude_isrcs: list[str] | None = None) -> dict:
+                     exclude_isrcs: list[str] | None = None,
+                     seed_distribution: dict | None = None) -> dict:
     """Build a Trajectory (contract dict). `shuffle` (0..1) is the serendipity
     fraction: that share of the journey is drawn from the user's go-to ∪ discovery
     (comfort + new-but-similar), the rest is aimed at the trajectory's targets.
-    transition_reason is left empty for the agent to fill."""
+    `seed_distribution` (the user's full ≤3-node weighted read) sets the journey's
+    starting point; absent → the single-seed `_soft_start`. transition_reason is
+    left empty for the agent to fill."""
     shuffle = max(0.0, min(1.0, shuffle))
     n_ser = round(shuffle * n_steps)
     n_tgt = n_steps - n_ser
+    start_dist = _dist_to_vec(seed_distribution)
 
     banned_artists, banned_isrcs = load_user_prefs()
     banned_isrcs = banned_isrcs | set(exclude_isrcs or [])  # already-played (entry/skips)
     used: set = set()
 
-    picks = _targeted_picks(seed_mood, shape, n_tgt, end_node, used, banned_artists, banned_isrcs)
+    picks = _targeted_picks(seed_mood, shape, n_tgt, end_node, used, banned_artists,
+                            banned_isrcs, start_dist)
     if n_ser > 0:
         picks += _serendipity_picks(n_ser, used, banned_artists, banned_isrcs, load_go_to())
 
@@ -617,7 +636,7 @@ def build_trajectory(seed_mood: str, shape: str, n_steps: int = 5,
         timestamps = list(ex.map(_ts, picks)) if picks else []
 
     # assemble the steps
-    start = operator_targets(shape, seed_mood, 1, end_node)[0]
+    start = operator_targets(shape, seed_mood, 1, end_node, start_dist)[0]
     steps = []
     for (target, item, vec, verse), ts in zip(picks, timestamps):
         steps.append({
