@@ -83,7 +83,7 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
     const cols = new Float32Array(pos.count * 3);
     for (let i = 0; i < pos.count; i++) {
       const t = Math.floor(i / (RAD + 1)) / TUB; // 0 oldest → 1 newest
-      const b = t * t;                            // tail fades out
+      const b = Math.min(1, 0.55 + t * 3.5);      // mostly full; only the oldest tip softly fades (never to black)
       cols[i * 3] = base.r * b; cols[i * 3 + 1] = base.g * b; cols[i * 3 + 2] = base.b * b;
     }
     geo.setAttribute("color", new THREE.BufferAttribute(cols, 3));
