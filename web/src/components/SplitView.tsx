@@ -444,7 +444,7 @@ export default function SplitView() {
           <span key={i} className={`h-2.5 w-2.5 rounded-full transition ${i < picks.length ? "bg-accent" : "bg-bg-elev-2"}`} />
         ))}
       </div>
-      <span className="text-sm text-muted-2">{picks.length < MAX_PICKS ? `tap ${MAX_PICKS - picks.length} more to play` : "playing"}</span>
+      <span className="text-sm text-muted-2">{picks.length === 0 ? "tap 3 · or just the same one" : picks.length < MAX_PICKS ? `tap ${MAX_PICKS - picks.length} more to play` : "playing"}</span>
     </div>
   );
 

@@ -70,18 +70,24 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
       return new THREE.Vector3(Math.cos(a) * rr, Math.sin(a) * rr, 0.1);
     });
   }, [trail]);
-  const trailGeo = useMemo(() => {
-    const g = new THREE.BufferGeometry().setFromPoints(trailPts);
-    const n = trailPts.length;
+  // the trail as a glowing tube (thin WebGL lines are 1px and get lost) with a tail that
+  // fades out: per-vertex brightness 0→1 along the path + additive blending, so the old
+  // end contributes nothing (invisible) and the recent end glows.
+  const trailTube = useMemo(() => {
+    if (trailPts.length < 2) return null;
+    const curve = new THREE.CatmullRomCurve3(trailPts, false, "catmullrom", 0.3);
+    const TUB = 80, RAD = 8;
+    const geo = new THREE.TubeGeometry(curve, TUB, 0.13, RAD, false);
     const base = new THREE.Color("#E8C36B");
-    const cols = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) {
-      const t = n > 1 ? i / (n - 1) : 1; // oldest → newest
-      const b = 0.18 + 0.82 * t;          // fade in along the path
+    const pos = geo.attributes.position;
+    const cols = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const t = Math.floor(i / (RAD + 1)) / TUB; // 0 oldest → 1 newest
+      const b = t * t;                            // tail fades out
       cols[i * 3] = base.r * b; cols[i * 3 + 1] = base.g * b; cols[i * 3 + 2] = base.b * b;
     }
-    g.setAttribute("color", new THREE.BufferAttribute(cols, 3));
-    return g;
+    geo.setAttribute("color", new THREE.BufferAttribute(cols, 3));
+    return geo;
   }, [trailPts]);
 
   // faint constellation spokes from the centre to each emotion (the "rays" Alberto liked)
@@ -131,12 +137,12 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
         );
       })}
 
-      {/* trail of the recent emotional path */}
-      {trailPts.length > 1 && (
-        <line>
-          <primitive object={trailGeo} attach="geometry" />
-          <lineBasicMaterial vertexColors transparent opacity={0.7} />
-        </line>
+      {/* constellation trail of the recent emotional path — glowing tube, tail fades out */}
+      {trailTube && (
+        <mesh>
+          <primitive object={trailTube} attach="geometry" />
+          <meshBasicMaterial vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+        </mesh>
       )}
 
       {/* centre core = intensity, coloured to the dominant mood (grey until chosen) */}
