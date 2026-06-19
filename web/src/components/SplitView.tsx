@@ -11,6 +11,7 @@
 //    or you skip it. Mock fallback on every endpoint → the demo never dies.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 
 import ConversationPanel, { type Msg } from "./ConversationPanel";
 import EmotionWheel from "./EmotionWheel";
@@ -28,6 +29,10 @@ import type {
   Trajectory,
   TrajectoryShape,
 } from "@/lib/types";
+
+// the 3D compass view (r3f) is client-only and behind a flag — keep it out of SSR and out
+// of the default bundle so the 2.5D app is untouched when the flag is off.
+const CompassScene = dynamic(() => import("./CompassScene"), { ssr: false });
 
 type QueueItem = { track: TrackCandidate; verse: string | null; reason: string | null };
 
@@ -87,6 +92,7 @@ export default function SplitView() {
   const [settings, setSettings] = useState<PlaybackSettings>(() => ({ knownNew: 0.5, skipMode: "scroll", language: defaultLanguage() }));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
+  const [compassMode, setCompassMode] = useState(false); // 3D compass view (flag: ?view=compass)
 
   // emotions → wheel (FIFO buffer of the last 3 presses). The shape derives from this.
   const [picks, setPicks] = useState<MacroNode[]>([]);
@@ -165,6 +171,10 @@ export default function SplitView() {
     if (!p) return;
     const seed = p.split(",").map((s) => s.trim()).filter(Boolean) as MacroNode[];
     if (seed.length) { picksRef.current = seed.slice(0, MAX_PICKS); setPicks(seed.slice(0, MAX_PICKS)); }
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("view") === "compass") setCompassMode(true);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -532,9 +542,13 @@ export default function SplitView() {
               number → max-h-[…]. The pips get their own row beneath it (clear of the ring). */}
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="flex min-h-0 flex-1 items-center justify-center">
-              <div className="relative aspect-square h-full max-h-[900px]">
-                <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
-              </div>
+              {compassMode ? (
+                <div className="h-full w-full"><CompassScene /></div>
+              ) : (
+                <div className="relative aspect-square h-full max-h-[900px]">
+                  <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
+                </div>
+              )}
             </div>
             <div className="flex shrink-0 justify-center pt-3 pb-1">{pips}</div>
           </section>
