@@ -201,15 +201,12 @@ input[type="range"] { accent-color: var(--accent); }
 .lyra-eq-bar:nth-child(2) { animation-delay: 0.22s; }
 .lyra-eq-bar:nth-child(3) { animation-delay: 0.44s; }
 
-/* accessibility: honor reduced motion — stop the breathing wheel + snap transitions
-   (the wheel's rAF tween also snaps via matchMedia in EmotionWheel) */
+/* accessibility under reduced-motion: we DON'T blanket-kill animation here — the compass
+   turning toward your emotion is the core of the product, and a frozen UI reads as broken
+   (a Mac with "Reduce Motion" on showed a dead dial). So the dial rotation, the loading
+   dots and the short fades stay; we only calm the slow, looping, purely-decorative "breathing"
+   (and the pointer parallax is already disabled in JS). */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
+  .lyra-breathe { animation: none !important; }
+  html { scroll-behavior: auto !important; }
 }

@@ -56,16 +56,16 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect, portrait }:
   const inited = useRef(false);
   const labelRefs = useRef<Array<THREE.Sprite | null>>([]);
   const hoveredRef = useRef<number | null>(null); // which emotion is hovered → its label grows
-  const reduced = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
   const target = dominant ? DIAL_F * (-Math.PI / 2 - baseAngle(idxOf(dominant))) : 0; // dominant → SOUTH (needle points at the viewer)
   // useFrame OWNS rotation.z (the JSX must NOT set rotation-z, or React would re-apply it
   // every render and the dial would snap instead of animating). First frame: snap to the
-  // start; after that, ease toward the dominant via the shortest path and hold.
+  // start; after that, ease toward the dominant via the shortest path and hold. NOTE: this
+  // turn is intentionally kept alive even under prefers-reduced-motion — the compass rotating
+  // to your emotion IS the product; a frozen dial reads as broken (Axel's Mac).
   useFrame((_, dt) => {
     const g = ref.current; if (!g) return;
     if (!inited.current) { g.rotation.z = target; inited.current = true; }
-    else if (!dominant) { if (!reduced) g.rotation.z += dt * 0.16; } // idle slow spin until something is chosen
-    else if (reduced) { g.rotation.z = target; }
+    else if (!dominant) { g.rotation.z += dt * 0.16; } // idle slow spin until something is chosen
     else {
       let d = target - g.rotation.z;
       d = Math.atan2(Math.sin(d), Math.cos(d));
@@ -195,12 +195,10 @@ function Needle({ dominant }: { dominant: MacroNode | null }) {
   // doesn't), so picking a nearby emotion barely moves the wheel. Points north when idle.
   const ref = useRef<THREE.Group>(null);
   const inited = useRef(false);
-  const reduced = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
   const target = dominant ? -(1 - DIAL_F) * (Math.PI / 2 - baseAngle(idxOf(dominant))) : 0;
   useFrame((_, dt) => {
     const g = ref.current; if (!g) return;
     if (!inited.current) { g.rotation.z = target; inited.current = true; return; }
-    if (reduced) { g.rotation.z = target; return; }
     let d = target - g.rotation.z;
     d = Math.atan2(Math.sin(d), Math.cos(d));
     g.rotation.z += d * Math.min(1, dt * 2.4);
