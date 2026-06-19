@@ -47,12 +47,15 @@ function Dial({ dominant, moodColor, comprehension, picks }: {
   dominant: MacroNode | null; moodColor: string; comprehension: number; picks: MacroNode[];
 }) {
   const ref = useRef<THREE.Group>(null);
+  const inited = useRef(false);
   const reduced = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
   const target = dominant ? (Math.PI / 2 - baseAngle(idxOf(dominant))) : 0;
-  // ease the dial toward the dominant emotion via the SHORTEST path, then hold it under
-  // the needle (no unbounded drift). Reduced motion → snap.
+  // useFrame OWNS rotation.z (the JSX must NOT set rotation-z, or React would re-apply it
+  // every render and the dial would snap instead of animating). First frame: snap to the
+  // start; after that, ease toward the dominant via the shortest path and hold.
   useFrame((_, dt) => {
     const g = ref.current; if (!g) return;
+    if (!inited.current) { g.rotation.z = target; inited.current = true; return; }
     if (reduced) { g.rotation.z = target; return; }
     let d = target - g.rotation.z;
     d = Math.atan2(Math.sin(d), Math.cos(d));
@@ -81,7 +84,7 @@ function Dial({ dominant, moodColor, comprehension, picks }: {
   const coreR = 0.5 + comprehension * 1.0;
 
   return (
-    <group ref={ref} rotation-z={target}>
+    <group ref={ref}>
       {/* rings + faint plate */}
       <mesh><ringGeometry args={[R - 0.05, R + 0.05, 100]} /><meshBasicMaterial color="#6a5fae" transparent opacity={0.4} side={THREE.DoubleSide} /></mesh>
       <mesh><ringGeometry args={[R * 0.6 - 0.04, R * 0.6 + 0.04, 80]} /><meshBasicMaterial color="#6a5fae" transparent opacity={0.22} side={THREE.DoubleSide} /></mesh>

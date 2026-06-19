@@ -136,10 +136,6 @@ export default function SplitView() {
   // current track's mood, then a soft violet.
   const moodMacro = useMemo<MacroNode | null>(() => dominantOf(distribution) ?? currentEmotion, [distribution, currentEmotion]);
   const moodColor = moodMacro ? TAXONOMY[moodMacro].color : "#5a4d8a";
-  // the compass needle/core follow the CURRENT track while playing (the journey), and the
-  // picks' dominant before playback (shaping). Scrubbing prev/next rotates the dial.
-  const compassDom = currentEmotion ?? moodMacro;
-  const compassColor = compassDom ? TAXONOMY[compassDom].color : "#5a4d8a";
 
   // subtle pointer parallax on the ambient aura (a fixed layer → zero layout impact): the
   // background glow drifts opposite the cursor, so it reads as depth behind the wheel.
@@ -547,7 +543,7 @@ export default function SplitView() {
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="flex min-h-0 flex-1 items-center justify-center">
               {compassMode ? (
-                <div className="h-full w-full"><CompassScene dominant={compassDom} moodColor={compassColor} comprehension={comprehension} picks={picks} /></div>
+                <div className="h-full w-full"><CompassScene dominant={moodMacro} moodColor={moodColor} comprehension={comprehension} picks={picks} /></div>
               ) : (
                 <div className="relative aspect-square h-full max-h-[900px]">
                   <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
@@ -558,7 +554,7 @@ export default function SplitView() {
           </section>
           {/* RIGHT — the chat panel. Fixed width, independent of the wheel. To resize it,
               change ONE number → w-[…]. */}
-          <section className={`mb-2 mt-2 flex shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40 ${compassMode ? "w-[340px]" : "w-[440px]"}`}>
+          <section className="mb-2 mt-2 flex w-[440px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
             <ConversationPanel variant="panel" {...convoProps} />
           </section>
         </main>
