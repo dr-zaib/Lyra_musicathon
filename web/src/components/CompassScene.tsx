@@ -47,11 +47,16 @@ function Dial({ dominant, moodColor, comprehension, picks }: {
   dominant: MacroNode | null; moodColor: string; comprehension: number; picks: MacroNode[];
 }) {
   const ref = useRef<THREE.Group>(null);
+  const reduced = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
   const target = dominant ? (Math.PI / 2 - baseAngle(idxOf(dominant))) : 0;
-  // ease the dial toward the target orientation + a slow idle drift
+  // ease the dial toward the dominant emotion via the SHORTEST path, then hold it under
+  // the needle (no unbounded drift). Reduced motion → snap.
   useFrame((_, dt) => {
     const g = ref.current; if (!g) return;
-    g.rotation.z += (target - g.rotation.z) * Math.min(1, dt * 2.2) + dt * 0.04;
+    if (reduced) { g.rotation.z = target; return; }
+    let d = target - g.rotation.z;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    g.rotation.z += d * Math.min(1, dt * 2.4);
   });
 
   const trailPts = useMemo(() => {
