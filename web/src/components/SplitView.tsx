@@ -102,7 +102,6 @@ export default function SplitView() {
   const [messages, setMessages] = useState<Msg[]>([]); // empty: the cold hero is the prompt, the feed fills with real turns
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
-  const [building, setBuilding] = useState(false); // a journey is (re)generating
   const [showSkipHint, setShowSkipHint] = useState(false);
   const skipHintDone = useRef(false);
 
@@ -256,10 +255,9 @@ export default function SplitView() {
 
   // rebuild the UPCOMING queue (new mood/mode) WITHOUT touching the current track.
   // It plays out (or the user skips); the new-mood tracks queue behind it. Progressive.
-  const rebuildTail = useCallback(async (forPicks: MacroNode[], shape: TrajectoryShape, silent = false) => {
+  const rebuildTail = useCallback(async (forPicks: MacroNode[], shape: TrajectoryShape) => {
     const seedMood = dominantOf(freqDistribution(forPicks));
     if (!seedMood) return;
-    if (!silent) setBuilding(true);
     let traj: Trajectory;
     try {
       const body: JourneyRequest = { seed_mood: seedMood, shape, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current };
@@ -271,17 +269,15 @@ export default function SplitView() {
       if (!res.ok) throw new Error(`journey ${res.status}`);
       traj = await res.json();
     } catch {
-      setBuilding(false);
       return;
     }
     const at = indexRef.current;
     const curId = queueRef.current[at]?.track.track_id;
     const steps = traj.steps.filter((s) => s.selected_track.track_id !== curId);
-    if (!steps.length) { setBuilding(false); return; }
+    if (!steps.length) return;
     const first = steps[0];
     const firstItem: QueueItem = { track: await enrichTrack(first.selected_track), verse: first.citable_verse ?? null, reason: first.transition_reason ?? null };
     setQueue((q) => [...q.slice(0, at + 1), firstItem]); // keep [0..current], replace the tail
-    setBuilding(false);
     if (steps.length > 1) {
       Promise.all(
         steps.slice(1).map(async (s) => ({ track: await enrichTrack(s.selected_track), verse: s.citable_verse ?? null, reason: s.transition_reason ?? null })),
@@ -361,7 +357,7 @@ export default function SplitView() {
     // hide the gen time: near the entry track's end, auto-build the journey (silent)
     if (!autoGenFired.current && playingRef.current && duration > 0 && duration - t <= 8) {
       autoGenFired.current = true;
-      rebuildTail(picksRef.current, modeRef.current, true);
+      rebuildTail(picksRef.current, modeRef.current);
     }
   };
 
@@ -371,7 +367,7 @@ export default function SplitView() {
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     picksRef.current = []; modeRef.current = "deepen";
     setMessages([]);
-    setPicks([]); setMode("deepen"); setPending(false); setBuilding(false); setShowSkipHint(false);
+    setPicks([]); setMode("deepen"); setPending(false); setShowSkipHint(false);
     setQueue([]); setIndex(0); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
@@ -402,7 +398,7 @@ export default function SplitView() {
 
   const convoProps = {
     messages, comprehension,
-    playing, pending, building, mode,
+    playing, pending, mode,
     draft, setDraft, onSubmit: submit,
     onExample: (text: string) => submitText(text),
     onSurprise: surprise,

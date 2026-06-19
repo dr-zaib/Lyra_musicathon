@@ -53,7 +53,6 @@ export default function ConversationPanel({
   comprehension,
   playing,
   pending,
-  building,
   mode,
   draft,
   setDraft,
@@ -69,7 +68,6 @@ export default function ConversationPanel({
   comprehension: number;
   playing: boolean;
   pending: boolean;
-  building: boolean;
   mode: TrajectoryShape;
   draft: string;
   setDraft: (s: string) => void;
@@ -139,7 +137,6 @@ export default function ConversationPanel({
                 </button>
               );
             })}
-            {building && <span className="text-[11px] text-muted-2">building…</span>}
           </div>
         )}
 
