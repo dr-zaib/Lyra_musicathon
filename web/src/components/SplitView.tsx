@@ -537,7 +537,6 @@ export default function SplitView() {
         {/* page header — title on the left, settings pinned top-right of the whole page */}
         <header className="flex shrink-0 items-baseline gap-3 pl-7 pr-16 pt-5">
           <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
-          <div className="min-w-0 flex-1"><LyricBanner verse={current?.verse ?? null} /></div>
           <div className="ml-auto">{settingsBtn}</div>
         </header>
         {/* main RESERVES the player's strip at the bottom at all times (pb-[104px]), so its
@@ -549,6 +548,8 @@ export default function SplitView() {
               depend on the margins, panel width, or the player. To resize it, change ONE
               number → max-h-[…]. The pips get their own row beneath it (clear of the ring). */}
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+            {/* the cited lyric, above the wheel */}
+            <div className="flex shrink-0 justify-center px-6 pt-1"><div className="w-full max-w-[440px]"><LyricBanner verse={current?.verse ?? null} /></div></div>
             <div className="flex min-h-0 flex-1 items-center justify-center">
               {!viewResolved ? null : compassMode ? (
                 <div className="h-full w-full"><CompassScene dominant={lastPick} moodColor={compassColor} comprehension={comprehension} trail={pickHistory.length ? pickHistory : picks} onSelect={pickEmotion} /></div>

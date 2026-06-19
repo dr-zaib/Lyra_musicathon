@@ -6,7 +6,6 @@
 // Kept flat (no vertical climb): depth is the journey, not height. Client-only (ssr:false).
 
 import { Canvas, useFrame } from "@react-three/fiber";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
@@ -19,7 +18,7 @@ const WHEEL_ORDER: MacroNode[] = [
 ];
 const N = WHEEL_ORDER.length;
 const R = 11;
-const DIAL_F = 0.35; // hybrid rotation: the dial turns this fraction toward the emotion, the needle covers the rest
+const DIAL_F = 1; // rotation split: 1 = dial turns fully, needle fixed at north (Alberto's pick). <1 = hybrid (kept for the roadmap).
 const idxOf = (m: MacroNode) => WHEEL_ORDER.indexOf(m);
 const baseAngle = (i: number) => (i / N) * Math.PI * 2; // 0 at +X, CCW
 
@@ -71,25 +70,30 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
       return new THREE.Vector3(Math.cos(a) * rr, Math.sin(a) * rr, 0.1);
     });
   }, [trail]);
-  // the trail as a glowing tube (thin WebGL lines are 1px and get lost) with a tail that
-  // fades out: per-vertex brightness 0→1 along the path + additive blending, so the old
-  // end contributes nothing (invisible) and the recent end glows.
+  // the trail as a glowing tube (thin WebGL lines are 1px and get lost). It flows through
+  // the COLOURS of the emotions it visits, and fades along its length (oldest dim → newest
+  // bright); additive blending makes it glow.
   const trailTube = useMemo(() => {
-    if (trailPts.length < 2) return null;
+    const n = trailPts.length;
+    if (n < 2) return null;
     const curve = new THREE.CatmullRomCurve3(trailPts, false, "catmullrom", 0.3);
-    const TUB = 80, RAD = 8;
-    const geo = new THREE.TubeGeometry(curve, TUB, 0.13, RAD, false);
-    const base = new THREE.Color("#E8C36B");
+    const TUB = 100, RAD = 8;
+    const geo = new THREE.TubeGeometry(curve, TUB, 0.15, RAD, false);
+    const emoCols = trail.map((m) => new THREE.Color(TAXONOMY[m].color));
     const pos = geo.attributes.position;
     const cols = new Float32Array(pos.count * 3);
+    const tmp = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
-      const t = Math.floor(i / (RAD + 1)) / TUB; // 0 oldest → 1 newest
-      const b = Math.min(1, 0.55 + t * 3.5);      // mostly full; only the oldest tip softly fades (never to black)
-      cols[i * 3] = base.r * b; cols[i * 3 + 1] = base.g * b; cols[i * 3 + 2] = base.b * b;
+      const u = Math.floor(i / (RAD + 1)) / TUB; // 0 oldest → 1 newest along the path
+      const fp = u * (n - 1);
+      const seg = Math.min(n - 2, Math.floor(fp));
+      tmp.copy(emoCols[seg]).lerp(emoCols[seg + 1], fp - seg); // colour of the emotion here
+      const b = 0.22 + 0.78 * u; // visible fade: dim at the old tail, bright at the head
+      cols[i * 3] = tmp.r * b; cols[i * 3 + 1] = tmp.g * b; cols[i * 3 + 2] = tmp.b * b;
     }
     geo.setAttribute("color", new THREE.BufferAttribute(cols, 3));
     return geo;
-  }, [trailPts]);
+  }, [trailPts, trail]);
 
   // faint constellation spokes from the centre to each emotion (the "rays" Alberto liked)
   const spokeGeo = useMemo(() => {
@@ -146,9 +150,11 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
         </mesh>
       )}
 
-      {/* centre core = intensity, coloured to the dominant mood (grey until chosen) */}
+      {/* centre core = intensity, coloured to the dominant mood (grey until chosen).
+          Additive halos give it a glow now that the full-screen bloom is gone. */}
       <mesh><sphereGeometry args={[coreR, 28, 28]} /><meshBasicMaterial color={coreCol} /></mesh>
-      <mesh><sphereGeometry args={[coreR * 2, 24, 24]} /><meshBasicMaterial color={coreCol} transparent opacity={0.18} /></mesh>
+      <mesh><sphereGeometry args={[coreR * 1.7, 24, 24]} /><meshBasicMaterial color={coreCol} transparent opacity={0.35} depthWrite={false} blending={THREE.AdditiveBlending} /></mesh>
+      <mesh><sphereGeometry args={[coreR * 2.8, 20, 20]} /><meshBasicMaterial color={coreCol} transparent opacity={0.12} depthWrite={false} blending={THREE.AdditiveBlending} /></mesh>
     </group>
   );
 }
@@ -194,9 +200,6 @@ export default function CompassScene({ dominant, moodColor, comprehension, trail
         <Dial dominant={dominant} moodColor={moodColor} comprehension={comprehension} trail={trail} onSelect={onSelect} />
         <Needle dominant={dominant} />
       </group>
-      <EffectComposer>
-        <Bloom intensity={0.7} luminanceThreshold={0.42} luminanceSmoothing={0.7} mipmapBlur />
-      </EffectComposer>
     </Canvas>
   );
 }
