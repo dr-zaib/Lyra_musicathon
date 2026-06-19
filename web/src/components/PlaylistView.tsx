@@ -5,6 +5,8 @@
 // (We don't hide upcoming tracks here on purpose: this view IS the "you have a playlist"
 // signal — the wheel + narration carry the mystery during normal playback.)
 
+import { motion } from "motion/react";
+
 import type { TrackCandidate } from "@/lib/types";
 
 type QueueItem = { track: TrackCandidate; verse: string | null; reason: string | null };
@@ -37,7 +39,11 @@ export default function PlaylistView({
             const current = i === index;
             const played = i < index;
             return (
-              <li key={`${it.track.track_id}-${i}`}>
+              <motion.li
+                key={`${it.track.track_id}-${i}`}
+                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: "easeOut", delay: Math.min(i, 12) * 0.03 }}
+              >
                 <button
                   onClick={() => onJump(i)}
                   aria-current={current ? "true" : undefined}
@@ -59,7 +65,7 @@ export default function PlaylistView({
                     <span className="block truncate text-[11px] text-muted-2">{it.track.artist}</span>
                   </span>
                 </button>
-              </li>
+              </motion.li>
             );
           })}
         </ol>

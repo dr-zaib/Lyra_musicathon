@@ -70,11 +70,8 @@ export default function EmotionWheel({
     const start = performance.now();
     let raf = 0;
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / 640);
-      // easeOutBack — a gentle overshoot so the shape springs into place instead of
-      // easing in flatly (a "settle" with a tiny bounce). c1 small = subtle.
-      const c1 = 1.15, p = t - 1;
-      const e = 1 + (c1 + 1) * p * p * p + c1 * p * p;
+      const t = Math.min(1, (now - start) / 600);
+      const e = 1 - Math.pow(1 - t, 3); // smooth ease-out, no overshoot
       const cur: Partial<Record<MacroNode, number>> = {};
       for (const k of keys) cur[k] = (from[k] ?? 0) + ((to[k] ?? 0) - (from[k] ?? 0)) * e;
       setDisp(cur);

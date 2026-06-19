@@ -6,8 +6,12 @@
 // Shared by both layouts: "panel" (desktop card) / "floating" (mobile over the scrim).
 
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 
 import type { TrajectoryShape } from "@/lib/types";
+
+// shared smooth entrance — fade + a small slide up, no bounce
+const ENTER = { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.35, ease: "easeOut" as const } };
 
 export type Msg = { role: "agent" | "user"; text: string };
 
@@ -36,10 +40,10 @@ function ThinkingIndicator({ floating }: { floating: boolean }) {
   }, []);
   const bubble = floating ? "border border-white/10 bg-white/[0.07] backdrop-blur-sm" : "bg-bg-elev/70";
   return (
-    <div className={`flex max-w-[80%] items-center gap-2 rounded-xl px-3 py-2.5 ${bubble}`} role="status" aria-live="polite" aria-label="lyra is thinking">
+    <motion.div {...ENTER} className={`flex max-w-[80%] items-center gap-2 rounded-xl px-3 py-2.5 ${bubble}`} role="status" aria-live="polite" aria-label="lyra is thinking">
       <span className="flex gap-1"><span className="lyra-typing-dot" /><span className="lyra-typing-dot" /><span className="lyra-typing-dot" /></span>
       <span className="text-xs text-muted">{THINKING[i]}</span>
-    </div>
+    </motion.div>
   );
 }
 
@@ -95,14 +99,17 @@ export default function ConversationPanel({
       {/* narration feed — fills the top */}
       <div className="no-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto py-2">
         {cold ? (
-          <div className={`flex h-full flex-col text-center ${floating ? "justify-start pt-[19vh]" : "justify-center pt-[8vh]"}`}>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: "easeOut" }}
+            className={`flex h-full flex-col text-center ${floating ? "justify-start pt-[19vh]" : "justify-center pt-[8vh]"}`}
+          >
             <h1 className="font-display text-[1.7rem] font-medium lowercase leading-[1.15] tracking-tight text-fg">tell lyra your mood,<br />get a playlist.</h1>
             <p className="mx-auto mt-2 max-w-[20rem] text-sm text-muted">{floating ? "three emotions — just tell me how you feel." : "three emotions — type them, or tap them on the wheel."}</p>
-          </div>
+          </motion.div>
         ) : (
           messages.map((m, i) =>
             m.text.trim() ? (
-              <div key={i} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.role === "agent" ? agentBubble : userBubble}`}>{m.text}</div>
+              <motion.div key={i} {...ENTER} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.role === "agent" ? agentBubble : userBubble}`}>{m.text}</motion.div>
             ) : null,
           )
         )}
