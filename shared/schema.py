@@ -89,6 +89,10 @@ class AgentTurnRequest(BaseModel):
     session_id: str | None = None
     seed_mood: MacroNode | None = None
     shape: TrajectoryShape | None = None
+    # the full weighted mood read (≤3 nodes) — the engine starts the journey from
+    # this instead of collapsing to `seed_mood` alone. `seed_mood` stays the
+    # dominant (back-compat). None → fall back to `seed_mood`.
+    seed_distribution: NodeDistribution | None = None
 
 
 class AgentTurn(BaseModel):
@@ -114,7 +118,8 @@ class AgentTurn(BaseModel):
 class EntryRequest(BaseModel):
     message: str | None = None
     session_id: str | None = None
-    seed_mood: MacroNode | None = None        # click-a-node shortcut
+    seed_mood: MacroNode | None = None        # click-a-node shortcut (dominant)
+    seed_distribution: NodeDistribution | None = None  # full ≤3-node weighted read
     n: int = 6                                 # how many entry candidates
     known_new: float | None = None            # % new (discovery); None → default
 
@@ -131,7 +136,8 @@ class EntryResponse(BaseModel):
 class JourneyRequest(BaseModel):
     """Build the playlist for a chosen shape, from the entry mood/track outward."""
 
-    seed_mood: MacroNode
+    seed_mood: MacroNode                                    # dominant (back-compat)
+    seed_distribution: NodeDistribution | None = None       # full ≤3-node weighted read → journey start
     shape: TrajectoryShape
     end_mood: MacroNode | None = None
     exclude_isrcs: list[str] = Field(default_factory=list)   # already played (entry/skips)

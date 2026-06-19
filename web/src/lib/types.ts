@@ -69,6 +69,9 @@ export interface AgentTurnRequest {
   message?: string | null;
   session_id?: string | null;
   seed_mood?: MacroNode | null;
+  // full weighted mood read (≤3 nodes) → the engine starts the journey from this,
+  // not just `seed_mood`. `seed_mood` stays the dominant (back-compat).
+  seed_distribution?: NodeDistribution | null;
   shape?: TrajectoryShape | null;
   language?: string | null; // ISO 639-1 lyrics language (Musixmatch lyrics_language)
 }
@@ -92,7 +95,8 @@ export interface AgentTurn {
 export interface EntryRequest {
   message?: string | null;
   session_id?: string | null;
-  seed_mood?: MacroNode | null; // click-a-node shortcut
+  seed_mood?: MacroNode | null; // click-a-node shortcut (dominant)
+  seed_distribution?: NodeDistribution | null; // full ≤3-node weighted read
   n?: number;                   // how many entry candidates (default 6)
   known_new?: number | null;    // % new (discovery); null → default
   language?: string | null;     // ISO 639-1 lyrics language; null → engine default ("en")
@@ -107,6 +111,7 @@ export interface EntryResponse {
 
 export interface JourneyRequest {
   seed_mood: MacroNode;
+  seed_distribution?: NodeDistribution | null; // full ≤3-node weighted read → journey start
   shape: TrajectoryShape;
   end_mood?: MacroNode | null;
   exclude_isrcs?: string[]; // already played (entry track + skips)

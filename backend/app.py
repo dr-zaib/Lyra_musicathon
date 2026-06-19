@@ -61,11 +61,14 @@ class RecommendRequest(AgentTurnRequest):
 
 
 def _engine_trajectory(seed_mood: str, shape: str, end_mood: str | None = None,
-                       shuffle: float = 0.0) -> Trajectory:
+                       shuffle: float = 0.0,
+                       seed_distribution: dict | None = None) -> Trajectory:
     """Real engine → validated Trajectory, then the agent voices transition_reason.
-    `shuffle` = the serendipity fraction (go-to ∪ discovery) from the intent."""
+    `shuffle` = the serendipity fraction (go-to ∪ discovery) from the intent.
+    `seed_distribution` = the full ≤3-node weighted read → the journey's start."""
     traj = Trajectory(**build_trajectory(seed_mood, shape, n_steps=N_STEPS,
-                                         end_node=end_mood, shuffle=shuffle))
+                                         end_node=end_mood, shuffle=shuffle,
+                                         seed_distribution=seed_distribution))
     return agent.narrate(traj)
 
 
@@ -95,7 +98,8 @@ def turn(req: AgentTurnRequest) -> AgentTurn:
     via the agent (LLM); the engine then builds the journey."""
     if req.seed_mood:
         seed, shape = req.seed_mood, (req.shape or "deepen")
-        distribution, shuffle, confidence, message = {seed: 1.0}, 0.0, 1.0, ""
+        sd = req.seed_distribution.weights if req.seed_distribution else None
+        distribution, shuffle, confidence, message = (sd or {seed: 1.0}), 0.0, 1.0, ""
         end_mood = None
     else:
         intent = agent.interpret(req.message or "")
@@ -105,7 +109,10 @@ def turn(req: AgentTurnRequest) -> AgentTurn:
         shuffle, confidence, message = intent["shuffle"], intent["confidence"], intent["message"]
         end_mood = intent.get("end_mood")
 
-    trajectory = _engine_trajectory(seed, shape, end_mood, shuffle)
+    # start the journey from the full weighted read (≤3 nodes), not just the dominant;
+    # a single-node read (e.g. a lone click) → None → the engine's fuzzy soft-start.
+    seed_dist = distribution if (distribution and len(distribution) > 1) else None
+    trajectory = _engine_trajectory(seed, shape, end_mood, shuffle, seed_dist)
 
     return AgentTurn(
         message=message,
@@ -121,7 +128,10 @@ def turn(req: AgentTurnRequest) -> AgentTurn:
 def entry(req: EntryRequest) -> EntryResponse:
     """Read the mood and return a skippable list of entry candidates. The player
     starts candidate[0] immediately; the journey is built later via /journey."""
-    if req.seed_mood:
+    if req.seed_distribution and req.seed_distribution.weights:
+        # the full ≤3-node weighted read → entry candidates matched to the whole mix
+        distribution, shuffle, confidence = req.seed_distribution.weights, 0.0, 1.0
+    elif req.seed_mood:
         distribution, shuffle, confidence = {req.seed_mood: 1.0}, 0.0, 1.0
     else:
         intent = agent.interpret(req.message or "")
@@ -141,9 +151,11 @@ def entry(req: EntryRequest) -> EntryResponse:
 def journey(req: JourneyRequest) -> Trajectory:
     """Build the playlist for the chosen shape, excluding what already played
     (entry track + skips). Queue it behind the entry track on the player."""
+    seed_dist = req.seed_distribution.weights if req.seed_distribution else None
     traj = Trajectory(**build_trajectory(
         req.seed_mood, req.shape, n_steps=N_STEPS,
-        end_node=req.end_mood, exclude_isrcs=req.exclude_isrcs))
+        end_node=req.end_mood, exclude_isrcs=req.exclude_isrcs,
+        seed_distribution=seed_dist))
     return agent.narrate(traj)
 
 
