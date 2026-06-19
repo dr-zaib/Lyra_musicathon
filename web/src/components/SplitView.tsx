@@ -438,9 +438,9 @@ export default function SplitView() {
   // strip reads as "the player appears here", not empty wasted space (Spotify-style idle bar).
   const playerPlaceholder = (
     <div aria-hidden className="border-t border-border bg-bg-elev/35 backdrop-blur-sm">
-      <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-3.5">
+      <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4">
         <div className="flex items-center gap-3 opacity-50">
-          <span className="h-12 w-12 shrink-0 rounded-md bg-bg-elev-2" />
+          <span className="h-14 w-14 shrink-0 rounded-md bg-bg-elev-2" />
           <div className="space-y-1.5">
             <span className="block h-2.5 w-28 rounded-full bg-bg-elev-2" />
             <span className="block h-2 w-20 rounded-full bg-bg-elev-2" />
@@ -526,7 +526,7 @@ export default function SplitView() {
             content area is a constant height — the wheel is sized by that area and never
             resizes when the player appears/disappears. The player is an absolute overlay
             that sits over the reserved strip (so it never pushes or covers content). */}
-        <main className="flex w-full flex-1 items-stretch gap-6 overflow-hidden pl-7 pr-16 pb-[88px] pt-2">
+        <main className="flex w-full flex-1 items-stretch gap-6 overflow-hidden pl-7 pr-16 pb-[104px] pt-2">
           {/* LEFT — the wheel. Sized ONLY by the column height (max-h below): it does NOT
               depend on the margins, panel width, or the player. To resize it, change ONE
               number → max-h-[…]. The pips get their own row beneath it (clear of the ring). */}
