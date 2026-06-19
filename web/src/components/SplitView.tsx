@@ -448,7 +448,7 @@ export default function SplitView() {
               <div className="aspect-square w-full max-w-[560px]">
                 <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
               </div>
-              {pips}
+              <div className="-mt-4">{pips}</div>
             </div>
           </section>
           <section className="mb-2 mr-2 mt-3 flex w-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
