@@ -126,7 +126,7 @@ export default function EmotionWheel({
     // each node's radius is a smooth "field": its own weight plus spill from neighbours
     // (gaussian over circular distance). The outline bulges toward the picks and rounds
     // out between them — a high floor keeps a full body so it never collapses inward.
-    const SIGMA = 0.9; // spill width, in node-steps
+    const SIGMA = 0.78; // spill width, in node-steps
     const field = WHEEL_ORDER.map((_, i) => {
       let f = 0;
       for (let j = 0; j < n; j++) {
@@ -136,7 +136,7 @@ export default function EmotionWheel({
       return f;
     });
     const maxF = Math.max(...field, 0.0001);
-    const FLOOR = 0.33, SPAN = 0.67; // dominant spike → the ring; valleys stay ≥ 0.33·R (no deep notch)
+    const FLOOR = 0.26, SPAN = 0.74; // dominant → the ring; the far side tapers in (directional) but never to a point
     const pts = WHEEL_ORDER.map((_, i) => at(i, R * (FLOOR + SPAN * (field[i] / maxF))));
     return { d: smoothClosed(pts), color: TAXONOMY[dom].color };
   }, [disp]);
