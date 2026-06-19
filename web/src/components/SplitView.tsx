@@ -554,7 +554,7 @@ export default function SplitView() {
           </section>
           {/* RIGHT — the chat panel. Fixed width, independent of the wheel. To resize it,
               change ONE number → w-[…]. */}
-          <section className="mb-2 mt-2 flex w-[440px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
+          <section className={`mb-2 mt-2 flex shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40 ${compassMode ? "w-[340px]" : "w-[440px]"}`}>
             <ConversationPanel variant="panel" {...convoProps} />
           </section>
         </main>
