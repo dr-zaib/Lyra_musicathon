@@ -6,7 +6,7 @@
 // Kept flat (no vertical climb): depth is the journey, not height. Client-only (ssr:false).
 
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { forwardRef, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 import { TAXONOMY } from "@/lib/taxonomy";
@@ -33,34 +33,53 @@ function makeTextTexture(text: string, color: string) {
   return t;
 }
 
-function Label({ text, color, position, big }: { text: string; color: string; position: [number, number, number]; big?: boolean }) {
-  const tex = useMemo(() => makeTextTexture(text, color), [text, color]);
-  const s = big ? 6.2 : 5;
-  return (
-    <sprite position={position} scale={[s, s / 4, 1]}>
-      <spriteMaterial map={tex} transparent depthWrite={false} />
-    </sprite>
-  );
-}
+// The sprite scale is NOT set here — the Dial drives it per-frame by each label's angular
+// distance from the needle (far = bigger, to invite the click that brings it to north).
+const Label = forwardRef<THREE.Sprite, { text: string; color: string; position: [number, number, number] }>(
+  function Label({ text, color, position }, ref) {
+    const tex = useMemo(() => makeTextTexture(text, color), [text, color]);
+    return (
+      <sprite ref={ref} position={position} scale={[6, 1.5, 1]}>
+        <spriteMaterial map={tex} transparent depthWrite={false} />
+      </sprite>
+    );
+  },
+);
 
 function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
   dominant: MacroNode | null; moodColor: string; comprehension: number; trail: MacroNode[]; onSelect?: (m: MacroNode) => void;
 }) {
   const ref = useRef<THREE.Group>(null);
   const inited = useRef(false);
+  const labelRefs = useRef<Array<THREE.Sprite | null>>([]);
   const reduced = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
-  const target = dominant ? DIAL_F * (Math.PI / 2 - baseAngle(idxOf(dominant))) : 0;
+  const target = dominant ? DIAL_F * (-Math.PI / 2 - baseAngle(idxOf(dominant))) : 0; // dominant → SOUTH (needle points at the viewer)
   // useFrame OWNS rotation.z (the JSX must NOT set rotation-z, or React would re-apply it
   // every render and the dial would snap instead of animating). First frame: snap to the
   // start; after that, ease toward the dominant via the shortest path and hold.
   useFrame((_, dt) => {
     const g = ref.current; if (!g) return;
-    if (!inited.current) { g.rotation.z = target; inited.current = true; return; }
-    if (!dominant) { if (!reduced) g.rotation.z += dt * 0.16; return; } // idle slow spin until something is chosen
-    if (reduced) { g.rotation.z = target; return; }
-    let d = target - g.rotation.z;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    g.rotation.z += d * Math.min(1, dt * 2.4);
+    if (!inited.current) { g.rotation.z = target; inited.current = true; }
+    else if (!dominant) { if (!reduced) g.rotation.z += dt * 0.16; } // idle slow spin until something is chosen
+    else if (reduced) { g.rotation.z = target; }
+    else {
+      let d = target - g.rotation.z;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      g.rotation.z += d * Math.min(1, dt * 2.4);
+    }
+    // size each label by how close it sits to the fixed north needle: the one under the
+    // needle is the largest, the far ones shrink — so the emotions already in focus read big
+    // and feel the most clickable.
+    const rot = g.rotation.z;
+    for (let i = 0; i < N; i++) {
+      const sp = labelRefs.current[i];
+      if (!sp) continue;
+      let a = baseAngle(i) + rot + Math.PI / 2; // distance from the SOUTH needle (-π/2)
+      a = Math.abs(Math.atan2(Math.sin(a), Math.cos(a))); // 0 at the needle → π opposite
+      const t = a / Math.PI;
+      const s = 8.4 - 3.8 * t; // 8.4 under the needle → 4.6 at the far side
+      sp.scale.set(s, s / 4, 1);
+    }
   });
 
   const trailPts = useMemo(() => {
@@ -137,7 +156,7 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
             <mesh position={[x, y, 0.05]}><sphereGeometry args={[isDom ? 0.32 : 0.16, 16, 16]} /><meshBasicMaterial color={col} /></mesh>
             {/* invisible but raycastable hit area for comfortable clicking */}
             {interactive && <mesh position={[x * 1.1, y * 1.1, 0.4]}><sphereGeometry args={[1.3, 10, 10]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>}
-            <Label text={m.toLowerCase()} color={col} position={[x * 1.2, y * 1.2, 0.6]} big={isDom} />
+            <Label ref={(el) => { labelRefs.current[i] = el; }} text={m.toLowerCase()} color={col} position={[x * 1.2, y * 1.2, 0.6]} />
           </group>
         );
       })}
@@ -183,9 +202,8 @@ function Needle({ dominant }: { dominant: MacroNode | null }) {
   const len = R * 0.86;
   return (
     <group ref={ref}>
-      {/* sleek round spire (was a 4-sided pyramid → squared) */}
-      <mesh position={[0, len / 2, 0.3]}><coneGeometry args={[0.17, len, 24]} /><meshBasicMaterial color="#E8C36B" /></mesh>
-      <mesh position={[0, R + 0.7, 0.3]}><sphereGeometry args={[0.26, 20, 20]} /><meshBasicMaterial color="#fff3d6" /></mesh>
+      {/* sleek round spire pointing SOUTH (toward the viewer); no tip bead (Alberto) */}
+      <mesh position={[0, -len / 2, 0.3]} rotation-z={Math.PI}><coneGeometry args={[0.17, len, 24]} /><meshBasicMaterial color="#E8C36B" /></mesh>
     </group>
   );
 }

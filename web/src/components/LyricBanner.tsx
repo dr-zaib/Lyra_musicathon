@@ -32,7 +32,7 @@ export default function LyricBanner({ verse }: { verse: string | null }) {
           transition={{ duration: 0.55, ease: "easeOut" }}
           className="absolute inset-0 block truncate text-center font-display text-sm italic text-muted"
         >
-          “{text}”
+          {text}
         </motion.span>
       </AnimatePresence>
     </div>

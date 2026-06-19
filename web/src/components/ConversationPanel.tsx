@@ -5,7 +5,7 @@
 //   ~33% from the bottom on desktop · "lyra's read" pinned as the very last element.
 // Shared by both layouts: "panel" (desktop card) / "floating" (mobile over the scrim).
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 
 import type { TrajectoryShape } from "@/lib/types";
@@ -81,6 +81,13 @@ export default function ConversationPanel({
   const floating = variant === "floating";
   const cold = !playing && messages.length === 0;
 
+  // keep the feed pinned to the newest message — new lines push older ones up
+  const feedRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = feedRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, pending]);
+
   const agentBubble = floating ? "bg-white/[0.07] border border-white/10 text-fg/90 backdrop-blur-sm" : "bg-bg-elev/70 text-fg/90";
   const userBubble = floating ? "ml-auto border border-accent/25 bg-accent/15 text-fg backdrop-blur-sm" : "ml-auto bg-bg-elev-2 text-fg";
   const inputBase = floating ? "border-white/15 bg-white/[0.06] backdrop-blur-sm" : "border-border bg-transparent";
@@ -95,7 +102,7 @@ export default function ConversationPanel({
       )}
 
       {/* narration feed — fills the top */}
-      <div className="no-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto py-2">
+      <div ref={feedRef} className="no-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto py-2">
         {cold ? (
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: "easeOut" }}
