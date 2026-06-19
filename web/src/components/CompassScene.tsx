@@ -56,6 +56,7 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
   useFrame((_, dt) => {
     const g = ref.current; if (!g) return;
     if (!inited.current) { g.rotation.z = target; inited.current = true; return; }
+    if (!dominant) { if (!reduced) g.rotation.z += dt * 0.16; return; } // idle slow spin until something is chosen
     if (reduced) { g.rotation.z = target; return; }
     let d = target - g.rotation.z;
     d = Math.atan2(Math.sin(d), Math.cos(d));
@@ -69,7 +70,19 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
       return new THREE.Vector3(Math.cos(a) * rr, Math.sin(a) * rr, 0.1);
     });
   }, [trail]);
-  const trailGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints(trailPts), [trailPts]);
+  const trailGeo = useMemo(() => {
+    const g = new THREE.BufferGeometry().setFromPoints(trailPts);
+    const n = trailPts.length;
+    const base = new THREE.Color("#E8C36B");
+    const cols = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const t = n > 1 ? i / (n - 1) : 1; // oldest → newest
+      const b = 0.18 + 0.82 * t;          // fade in along the path
+      cols[i * 3] = base.r * b; cols[i * 3 + 1] = base.g * b; cols[i * 3 + 2] = base.b * b;
+    }
+    g.setAttribute("color", new THREE.BufferAttribute(cols, 3));
+    return g;
+  }, [trailPts]);
 
   // faint constellation spokes from the centre to each emotion (the "rays" Alberto liked)
   const spokeGeo = useMemo(() => {
@@ -82,6 +95,7 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
   }, []);
 
   const coreR = 0.5 + comprehension * 1.0;
+  const coreCol = dominant ? moodColor : "#6b6880"; // neutral grey until an emotion is chosen
 
   return (
     <group ref={ref}>
@@ -121,13 +135,13 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
       {trailPts.length > 1 && (
         <line>
           <primitive object={trailGeo} attach="geometry" />
-          <lineBasicMaterial color="#E8C36B" transparent opacity={0.4} />
+          <lineBasicMaterial vertexColors transparent opacity={0.7} />
         </line>
       )}
 
-      {/* centre core = intensity, coloured to the dominant mood */}
-      <mesh><sphereGeometry args={[coreR, 28, 28]} /><meshBasicMaterial color={moodColor} /></mesh>
-      <mesh><sphereGeometry args={[coreR * 2, 24, 24]} /><meshBasicMaterial color={moodColor} transparent opacity={0.18} /></mesh>
+      {/* centre core = intensity, coloured to the dominant mood (grey until chosen) */}
+      <mesh><sphereGeometry args={[coreR, 28, 28]} /><meshBasicMaterial color={coreCol} /></mesh>
+      <mesh><sphereGeometry args={[coreR * 2, 24, 24]} /><meshBasicMaterial color={coreCol} transparent opacity={0.18} /></mesh>
     </group>
   );
 }
@@ -156,7 +170,7 @@ export default function CompassScene({ dominant, moodColor, comprehension, trail
       style={{ width: "100%", height: "100%", background: "transparent" }}
     >
       <ambientLight intensity={0.6} />
-      <group rotation-x={-1.0} position={[-2, 0.5, -2]} scale={0.9}>
+      <group rotation-x={-1.0} position={[-2, 1.8, -2]} scale={0.9}>
         <Dial dominant={dominant} moodColor={moodColor} comprehension={comprehension} trail={trail} onSelect={onSelect} />
         <Needle />
       </group>

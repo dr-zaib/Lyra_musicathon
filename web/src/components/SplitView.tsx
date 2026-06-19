@@ -93,6 +93,7 @@ export default function SplitView() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [compassMode, setCompassMode] = useState(false); // 3D compass view (flag: ?view=compass)
+  const [viewResolved, setViewResolved] = useState(false); // gate the left viz until the mode is known (no 2.5D flash)
 
   // emotions → wheel (FIFO buffer of the last 3 presses). The shape derives from this.
   const [picks, setPicks] = useState<MacroNode[]>([]);
@@ -175,8 +176,8 @@ export default function SplitView() {
     if (seed.length) { picksRef.current = seed.slice(0, MAX_PICKS); setPicks(seed.slice(0, MAX_PICKS)); }
   }, []);
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (new URLSearchParams(window.location.search).get("view") === "compass") setCompassMode(true);
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "compass") setCompassMode(true);
+    setViewResolved(true);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -545,7 +546,7 @@ export default function SplitView() {
               number → max-h-[…]. The pips get their own row beneath it (clear of the ring). */}
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="flex min-h-0 flex-1 items-center justify-center">
-              {compassMode ? (
+              {!viewResolved ? null : compassMode ? (
                 <div className="h-full w-full"><CompassScene dominant={moodMacro} moodColor={moodColor} comprehension={comprehension} trail={pickHistory.length ? pickHistory : picks} onSelect={pickEmotion} /></div>
               ) : (
                 <div className="relative aspect-square h-full max-h-[900px]">
