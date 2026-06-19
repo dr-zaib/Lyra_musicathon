@@ -437,23 +437,26 @@ export default function SplitView() {
       {/* ===== DESKTOP ===== */}
       <div className="hidden h-screen flex-col md:flex">
         {/* page header — title on the left, settings pinned top-right of the whole page */}
-        <header className="flex shrink-0 items-baseline gap-3 px-7 pt-5">
+        <header className="flex shrink-0 items-baseline gap-3 pl-7 pr-16 pt-5">
           <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
           <span className="text-xs text-muted">the lyrics layer for your player</span>
-          <div className="ml-auto pr-4">{settingsBtn}</div>
+          <div className="ml-auto">{settingsBtn}</div>
         </header>
-        <main className="flex w-full flex-1 gap-6 overflow-hidden px-7 pb-6 pt-3">
-          <section className="flex w-1/2 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-            {/* wheel stays centered; pips are absolutely positioned just below the ring so
-                nudging them never shifts the wheel */}
+        <main className="flex w-full flex-1 items-stretch gap-6 overflow-hidden pl-7 pr-16 pb-6 pt-3">
+          {/* LEFT — the wheel. Sized ONLY by the column height (max-h below): it does NOT
+              depend on the margins or the panel width, so changing those never resizes the
+              ring. To resize the wheel, change ONE number → max-h-[…]. */}
+          <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="flex flex-1 items-center justify-center pb-7">
-              <div className="relative aspect-square w-full max-w-[672px]">
+              <div className="relative aspect-square h-full max-h-[860px] -translate-y-[2.5%]">
                 <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
                 <div className="pointer-events-none absolute inset-x-0 bottom-[5%] flex justify-center">{pips}</div>
               </div>
             </div>
           </section>
-          <section className="mb-2 mr-4 mt-3 flex w-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
+          {/* RIGHT — the chat panel. Fixed width, independent of the wheel. To resize it,
+              change ONE number → w-[…]. */}
+          <section className="mb-2 mt-3 flex w-[440px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
             <ConversationPanel variant="panel" {...convoProps} />
           </section>
         </main>

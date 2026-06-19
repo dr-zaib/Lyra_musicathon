@@ -119,7 +119,7 @@ export default function EmotionWheel({
   const interactive = !!onSelect;
 
   return (
-    <svg viewBox="-16 -16 132 132" className="h-full w-full" role="img" aria-label="emotional wheel">
+    <svg viewBox={big ? "-10 -10 120 120" : "-16 -16 132 132"} className="h-full w-full" role="img" aria-label="emotional wheel">
       <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--border)" strokeWidth={0.4} />
       <circle cx={CX} cy={CY} r={R * 0.4} fill="none" stroke="var(--border)" strokeWidth={0.3} />
 

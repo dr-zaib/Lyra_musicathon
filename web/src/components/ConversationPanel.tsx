@@ -113,14 +113,13 @@ export default function ConversationPanel({
       <div className="shrink-0 space-y-2">
         {/* cold: example moods + surprise · playing: the steer pills (lit by mode) */}
         {!playing ? (
-          <div className="space-y-2 md:space-y-0">
-            <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-center gap-2">
               {EXAMPLES.map((ex) => (
                 <button key={ex} onClick={() => onExample(ex)} className="rounded-full border border-border px-3 py-1.5 text-[13px] text-muted transition hover:border-accent hover:text-fg">{ex}</button>
               ))}
-              <button onClick={onSurprise} className="ml-auto hidden text-sm text-muted transition hover:text-fg md:inline">surprise me</button>
             </div>
-            <button onClick={onSurprise} className="block w-full text-center text-sm text-muted transition hover:text-fg md:hidden">surprise me</button>
+            <button onClick={onSurprise} className="block w-full text-center text-sm text-muted transition hover:text-fg">surprise me</button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
