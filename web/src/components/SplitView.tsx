@@ -17,6 +17,7 @@ import EmotionWheel from "./EmotionWheel";
 import PlayerBar from "./PlayerBar";
 import PlaylistView from "./PlaylistView";
 import Settings, { type PlaybackSettings, defaultLanguage } from "./Settings";
+import { TAXONOMY } from "@/lib/taxonomy";
 import type {
   AgentTurn,
   EntryResponse,
@@ -125,10 +126,29 @@ export default function SplitView() {
   const current = queue[index] ?? null;
   const currentEmotion = useMemo<MacroNode | null>(() => (current ? dominantOf(current.track.distribution) : null), [current]);
 
+  // ambient mood aura: the room glows toward the dominant emotion as picks accumulate
+  // (invisible at rest, warm when engaged). Colour from the picks, fallback to the
+  // current track's mood, then a soft violet.
+  const moodMacro = useMemo<MacroNode | null>(() => dominantOf(distribution) ?? currentEmotion, [distribution, currentEmotion]);
+  const moodColor = moodMacro ? TAXONOMY[moodMacro].color : "#5a4d8a";
+
   // keep refs in sync so the imperative triggers below read fresh values
   useEffect(() => { queueRef.current = queue; playingRef.current = queue.length > 0; }, [queue]);
   useEffect(() => { indexRef.current = index; }, [index]);
   useEffect(() => { picksRef.current = picks; }, [picks]);
+
+  // dev/demo: ?picks=Anger,Hope,Reflection seeds the wheel SHAPE only (no playback / no
+  // network) so any wheel state can be captured deterministically for screenshots + the
+  // 90s video. Inert without the param.
+  /* eslint-disable react-hooks/set-state-in-effect -- one-shot mount seed from the URL */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search).get("picks");
+    if (!p) return;
+    const seed = p.split(",").map((s) => s.trim()).filter(Boolean) as MacroNode[];
+    if (seed.length) { picksRef.current = seed.slice(0, MAX_PICKS); setPicks(seed.slice(0, MAX_PICKS)); }
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // play the current track + narrate it into the feed
   /* eslint-disable react-hooks/set-state-in-effect -- syncing the <audio> element + narration */
@@ -386,6 +406,16 @@ export default function SplitView() {
 
   return (
     <div className="relative z-10">
+      {/* ambient mood aura — a fixed room glow that blooms in the dominant emotion's
+          colour as you engage; invisible at rest. Sits behind everything (z-0). */}
+      <div
+        aria-hidden
+        className="lyra-aura pointer-events-none fixed inset-0 z-0"
+        style={{
+          background: `radial-gradient(70% 55% at 50% 42%, ${moodColor}, transparent 68%)`,
+          opacity: Math.round(comprehension * 22) / 100,
+        }}
+      />
       <audio
         ref={audioRef}
         onTimeUpdate={(e) => onTimeUpdate(e.currentTarget.currentTime)}

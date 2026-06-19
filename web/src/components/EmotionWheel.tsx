@@ -116,10 +116,37 @@ export default function EmotionWheel({
     return { points, color: TAXONOMY[dom].color };
   }, [disp]);
 
+  // the centre "core" — a soft breathing orb that gives the empty middle some life and
+  // warms toward the dominant emotion as picks accumulate (violet at rest).
+  const coreColor = radar?.color ?? "#7a6ad6";
+
   const interactive = !!onSelect;
 
   return (
     <svg viewBox={big ? "-10 -10 120 120" : "-16 -16 132 132"} className="h-full w-full" role="img" aria-label="emotional wheel">
+      {/* shared decorative defs: the core's radial glow + a soft blur for the radar */}
+      <defs>
+        <radialGradient id="lw-core" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={coreColor} stopOpacity={0.82} />
+          <stop offset="48%" stopColor={coreColor} stopOpacity={0.28} />
+          <stop offset="100%" stopColor={coreColor} stopOpacity={0} />
+        </radialGradient>
+        <filter id="lw-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation={faintShape ? 0.6 : 0.9} result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* the breathing core — empty middle gets a soft orb that grows + warms with picks */}
+      {shape && (
+        <g style={{ opacity: rd((0.72 + comprehension * 0.28) * (faintShape ? 0.7 : 1)), transition: "opacity .6s ease" }} pointerEvents="none">
+          <circle className="lyra-core" cx={CX} cy={CY} r={rd(R * 0.9)} fill="url(#lw-core)" />
+        </g>
+      )}
+
       <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--border)" strokeWidth={0.4} />
       <circle cx={CX} cy={CY} r={R * 0.4} fill="none" stroke="var(--border)" strokeWidth={0.3} />
 
@@ -130,6 +157,7 @@ export default function EmotionWheel({
           points={radar.points}
           fill={radar.color} fillOpacity={rd((0.08 + comprehension * 0.16) * (faintShape ? 0.4 : 1))}
           stroke={radar.color} strokeOpacity={rd((0.3 + comprehension * 0.4) * (faintShape ? 0.5 : 1))} strokeWidth={faintShape ? 0.6 : 0.8} strokeLinejoin="round"
+          filter="url(#lw-glow)"
           style={{ transition: "fill .4s ease, stroke .4s ease, fill-opacity .5s ease, stroke-opacity .5s ease" }}
         />
       )}
