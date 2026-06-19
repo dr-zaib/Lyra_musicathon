@@ -403,11 +403,11 @@ export default function SplitView() {
         <div className="absolute right-4 top-4 z-30">{settingsBtn}</div>
         {/* the wheel builds its shape in the background — also the scroll/swipe skip surface */}
         <div
-          className="pointer-events-auto absolute left-1/2 top-[34%] aspect-square w-[150vw] max-w-[600px] -translate-x-1/2 -translate-y-1/2 opacity-50"
+          className="pointer-events-auto absolute left-1/2 top-[34%] aspect-square w-[150vw] max-w-[600px] -translate-x-1/2 -translate-y-1/2 opacity-70"
           onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         >
           <div className="lyra-breathe h-full w-full">
-            <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape />
+            <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape faintShape onSelect={pickEmotion} />
           </div>
         </div>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-bg via-bg/85 to-transparent" />
@@ -436,21 +436,22 @@ export default function SplitView() {
 
       {/* ===== DESKTOP ===== */}
       <div className="hidden h-screen flex-col md:flex">
-        <main className="flex w-full flex-1 gap-6 overflow-hidden px-6 py-5">
+        {/* page header — title on the left, settings pinned top-right of the whole page */}
+        <header className="flex shrink-0 items-baseline gap-3 px-7 pt-5">
+          <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
+          <span className="text-xs text-muted">the lyrics layer for your player</span>
+          <div className="ml-auto">{settingsBtn}</div>
+        </header>
+        <main className="flex w-full flex-1 gap-6 overflow-hidden px-7 pb-6 pt-3">
           <section className="flex w-1/2 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-            <div className="mb-2 flex items-baseline gap-3">
-              <span className="font-display text-2xl font-medium lowercase tracking-tight">lyra<span className="text-accent">.</span></span>
-              <span className="text-xs text-muted">the lyrics layer for your player</span>
-              <div className="ml-auto">{settingsBtn}</div>
-            </div>
-            <div className="flex flex-1 flex-col items-center justify-center gap-4">
-              <div className="aspect-square w-full max-w-[500px]">
-                <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape onSelect={pickEmotion} />
+            <div className="flex flex-1 flex-col items-center justify-center gap-1">
+              <div className="aspect-square w-full max-w-[560px]">
+                <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
               </div>
               {pips}
             </div>
           </section>
-          <section className="flex w-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
+          <section className="mb-2 mr-2 mt-3 flex w-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-bg-elev/40">
             <ConversationPanel variant="panel" {...convoProps} />
           </section>
         </main>

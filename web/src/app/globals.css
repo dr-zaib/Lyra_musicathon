@@ -124,6 +124,11 @@ body::before {
   animation-delay: 0.3s;
 }
 
+/* hidden scrollbar — the chat feed scrolls but never shows a bar (and no flash on
+   state changes); content stays in its own container, never over the controls. */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* range inputs: the native thumb picks up the OS accent colour (a stray red dot on
    some Windows setups). Force our accent, then take explicit control of the thumb. */
 input[type="range"] { accent-color: var(--accent); }

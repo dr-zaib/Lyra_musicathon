@@ -17,8 +17,7 @@ import type { MacroNode } from "@/lib/types";
 
 const CX = 50;
 const CY = 50;
-const R = 40;
-const RL = 47;
+const R = 36; // -10% (was 40) — pulls the ring, nodes, radar + labels inward
 
 const WHEEL_ORDER: MacroNode[] = [
   "Tenderness", "Hope", "Joy", "Empowerment",
@@ -38,6 +37,8 @@ export default function EmotionWheel({
   currentEmotion = null,
   showLabels = true,
   shape = false,
+  faintShape = false,
+  big = false,
   onSelect,
 }: {
   distribution?: Partial<Record<MacroNode, number>>;
@@ -45,6 +46,8 @@ export default function EmotionWheel({
   currentEmotion?: MacroNode | null;
   showLabels?: boolean;
   shape?: boolean;
+  faintShape?: boolean; // dim the radar polygon (mobile background, so labels read over it)
+  big?: boolean;        // larger labels (desktop)
   onSelect?: (m: MacroNode) => void;
 }) {
   const [hovered, setHovered] = useState<MacroNode | null>(null);
@@ -79,25 +82,25 @@ export default function EmotionWheel({
   }, [distribution]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // active mood labels (top 3), placed beyond their spike tips — used in shape-only
-  // (mobile) mode where the 12 nodes aren't drawn.
-  const verts = useMemo(() => {
-    if (!disp) return [] as { name: MacroNode; lx: number; ly: number; anchor: "start" | "middle" | "end"; op: number }[];
-    const top = (Object.entries(disp) as [MacroNode, number][])
-      .filter(([, w]) => w > 0.04)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
-    const maxW = top[0]?.[1] ?? 1;
-    return top.map(([name, w]) => {
-      const norm = w / maxW;
-      const ang = (WHEEL_ORDER.indexOf(name) * 2 * Math.PI) / WHEEL_ORDER.length;
-      const lr = R * (0.15 + 0.85 * norm) + 4;
-      const lx = rd(CX + lr * Math.cos(ang));
-      const ly = rd(CY - lr * Math.sin(ang));
-      const anchor: "start" | "middle" | "end" = lx > CX + 1 ? "start" : lx < CX - 1 ? "end" : "middle";
-      return { name, lx, ly, anchor, op: rd(0.55 + 0.45 * norm) };
+  // shape-only (mobile): the 12 emotion labels CURVED along a ring just outside the wheel.
+  // Each label is an arc segment with text on a path. Readable on both halves like a coin:
+  // top arcs drawn clockwise (ascenders point outward), bottom arcs drawn counter-clockwise
+  // (ascenders point inward) — so nothing is upside-down. Curving also tucks the side
+  // labels along the arc instead of radiating them off the screen edges.
+  const RC = 40.5; // label-ring radius (-10%, was 45), just outside the wheel ring
+  const labelArcs = useMemo(() => {
+    const spread = (18 * Math.PI) / 180; // arc half-width per label
+    const pt = (a: number) => `${rd(CX + RC * Math.cos(a))},${rd(CY - RC * Math.sin(a))}`;
+    return WHEEL_ORDER.map((name, i) => {
+      const theta = (i * 2 * Math.PI) / WHEEL_ORDER.length; // math angle (CCW from +x)
+      const topHalf = Math.sin(theta) >= -0.001;
+      const a1 = theta + spread, a2 = theta - spread;
+      const d = topHalf
+        ? `M ${pt(a1)} A ${RC} ${RC} 0 0 1 ${pt(a2)}` // clockwise → reads outward
+        : `M ${pt(a2)} A ${RC} ${RC} 0 0 0 ${pt(a1)}`; // counter-clockwise → reads inward
+      return { name, id: `lw-arc-${i}`, d };
     });
-  }, [disp]);
+  }, []);
 
   // the radar polygon: one cohesive angular shape through all 12 nodes, each pushed out
   // by its weight (floor keeps a small core). One mood → a rhombus/arrow at it.
@@ -113,14 +116,6 @@ export default function EmotionWheel({
     return { points, color: TAXONOMY[dom].color };
   }, [disp]);
 
-  function nodeStyle(name: MacroNode): { op: number; r: number } {
-    const w = disp?.[name] ?? 0;
-    if (hovered === name || focused === name) return { op: 1, r: 3 }; // modest dot — the halo + lit label carry the hover
-    if (currentEmotion === name) return { op: 1, r: 3 };
-    if (w > 0.04) return { op: rd(Math.min(1, 0.55 + w * 0.6)), r: rd(2 + w * 1.6) };
-    return { op: 0.4, r: 2 }; // no dim-others-on-hover → no strobing when sweeping across nodes
-  }
-
   const interactive = !!onSelect;
 
   return (
@@ -133,76 +128,58 @@ export default function EmotionWheel({
       {shape && radar && (
         <polygon
           points={radar.points}
-          fill={radar.color} fillOpacity={rd(0.08 + comprehension * 0.16)}
-          stroke={radar.color} strokeOpacity={rd(0.3 + comprehension * 0.4)} strokeWidth={0.8} strokeLinejoin="round"
+          fill={radar.color} fillOpacity={rd((0.08 + comprehension * 0.16) * (faintShape ? 0.4 : 1))}
+          stroke={radar.color} strokeOpacity={rd((0.3 + comprehension * 0.4) * (faintShape ? 0.5 : 1))} strokeWidth={faintShape ? 0.6 : 0.8} strokeLinejoin="round"
           style={{ transition: "fill .4s ease, stroke .4s ease, fill-opacity .5s ease, stroke-opacity .5s ease" }}
         />
       )}
 
-      {/* desktop: the 12 clickable, labelled nodes (orientation + steering) */}
-      {interactive && WHEEL_ORDER.map((name, i) => {
-        const p = at(i, R);
-        const lp = at(i, RL);
-        const { op, r } = nodeStyle(name);
-        const color = TAXONOMY[name].color;
-        const anchor = lp.x > CX + 1 ? "start" : lp.x < CX - 1 ? "end" : "middle";
-        const active = (disp?.[name] ?? 0) > 0.04 || hovered === name || focused === name || currentEmotion === name;
-        return (
-          <g
-            key={name}
-            role="button"
-            tabIndex={0}
-            aria-label={`steer toward ${name}`}
-            style={{ cursor: "pointer", outline: "none" }}
-            onMouseEnter={() => setHovered(name)}
-            onMouseLeave={() => setHovered(null)}
-            onFocus={() => setFocused(name)}
-            onBlur={() => setFocused(null)}
-            onClick={() => onSelect?.(name)}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect?.(name); } }}
-          >
-            <circle cx={p.x} cy={p.y} r={7} fill="transparent" />
-            {(hovered === name || focused === name) && (
-              // a thin halo ring — no filled disc, so it never collides with the label
-              <circle cx={p.x} cy={p.y} r={4.5} fill="none" stroke={color} strokeWidth={0.6} opacity={0.9}
-                style={{ transition: "r .25s ease, opacity .25s ease" }} />
-            )}
-            <circle
-              cx={p.x} cy={p.y} r={r} fill={color} opacity={op}
-              style={{ transition: "r .3s cubic-bezier(.22,.9,.25,1), opacity .4s ease" }}
-            />
-            {showLabels && (
-              <text
-                x={lp.x} y={lp.y + 1} textAnchor={anchor} fontSize={active ? 3.5 : 3.3}
-                className="font-display"
-                fill="var(--fg)"
-                opacity={active ? 1 : 0.92}
-                style={{
-                  transition: "opacity .35s ease, font-size .25s ease",
-                  filter: active
-                    ? "drop-shadow(0 0 1.4px rgba(232,181,74,0.55))"
-                    : "drop-shadow(0 0 0.8px rgba(236,233,245,0.35))",
-                }}
+      {/* the 12 emotion labels — curved around the ring, coloured by emotion, and
+          clickable (when onSelect) to steer. The label IS the control now (no dot-nodes).
+          A wide transparent arc behind each gives a comfortable tap/click area. */}
+      {shape && showLabels && (
+        <>
+          <defs>
+            {labelArcs.map((l) => <path key={l.id} id={l.id} d={l.d} fill="none" />)}
+          </defs>
+          {labelArcs.map((l) => {
+            const color = TAXONOMY[l.name].color;
+            const picked = (disp?.[l.name] ?? 0) > 0.04 || currentEmotion === l.name;
+            const hot = hovered === l.name || focused === l.name;
+            const lit = picked || hot;
+            return (
+              <g
+                key={`lw-${l.name}`}
+                role={interactive ? "button" : undefined}
+                tabIndex={interactive ? 0 : undefined}
+                aria-label={interactive ? `steer toward ${l.name}` : undefined}
+                style={interactive ? { cursor: "pointer", outline: "none" } : undefined}
+                onMouseEnter={interactive ? () => setHovered(l.name) : undefined}
+                onMouseLeave={interactive ? () => setHovered(null) : undefined}
+                onFocus={interactive ? () => setFocused(l.name) : undefined}
+                onBlur={interactive ? () => setFocused(null) : undefined}
+                onClick={interactive ? () => onSelect?.(l.name) : undefined}
+                onKeyDown={interactive ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect?.(l.name); } } : undefined}
               >
-                {name.toLowerCase()}
-              </text>
-            )}
-          </g>
-        );
-      })}
-
-      {/* shape-only (mobile): label just the active moods */}
-      {shape && !interactive && showLabels && verts.map((v) => (
-        <text
-          key={`lab-${v.name}`}
-          x={v.lx} y={v.ly} textAnchor={v.anchor} fontSize={2.7}
-          className="font-display"
-          fill="var(--fg)" opacity={v.op}
-          style={{ transition: "x .6s cubic-bezier(.22,.9,.25,1), y .6s cubic-bezier(.22,.9,.25,1), opacity .5s ease" }}
-        >
-          {v.name.toLowerCase()}
-        </text>
-      ))}
+                {interactive && <path d={l.d} fill="none" stroke="transparent" strokeWidth={9} strokeLinecap="round" />}
+                <text
+                  fontSize={rd((big ? 4.3 : 2.9) * (hot ? 1.08 : 1))}
+                  className="font-display"
+                  fill={color}
+                  opacity={lit ? 1 : 0.72}
+                  style={{
+                    transition: "opacity .35s ease, font-size .2s ease",
+                    fontWeight: picked ? 600 : 400,
+                    filter: lit ? `drop-shadow(0 0 1.3px ${color})` : "none",
+                  }}
+                >
+                  <textPath href={`#${l.id}`} startOffset="50%" textAnchor="middle">{l.name.toLowerCase()}</textPath>
+                </text>
+              </g>
+            );
+          })}
+        </>
+      )}
     </svg>
   );
 }

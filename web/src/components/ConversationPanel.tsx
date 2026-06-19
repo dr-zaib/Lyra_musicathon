@@ -93,9 +93,9 @@ export default function ConversationPanel({
       )}
 
       {/* narration feed — fills the top */}
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-2">
+      <div className="no-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto py-2">
         {cold ? (
-          <div className={`flex h-full flex-col text-center ${floating ? "justify-start pt-[15vh]" : "justify-center"}`}>
+          <div className={`flex h-full flex-col text-center ${floating ? "justify-start pt-[19vh]" : "justify-center pt-[8vh]"}`}>
             <h1 className="font-display text-[1.7rem] font-medium lowercase leading-[1.15] tracking-tight text-fg">tell lyra your mood,<br />get a playlist.</h1>
             <p className="mx-auto mt-2 max-w-[20rem] text-sm text-muted">{floating ? "three emotions — just tell me how you feel." : "three emotions — type them, or tap them on the wheel."}</p>
           </div>
@@ -113,13 +113,14 @@ export default function ConversationPanel({
       <div className="shrink-0 space-y-2">
         {/* cold: example moods + surprise · playing: the steer pills (lit by mode) */}
         {!playing ? (
-          <div className="space-y-2">
-            <div className="flex flex-wrap justify-center gap-2 md:justify-start">
+          <div className="space-y-2 md:space-y-0">
+            <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
               {EXAMPLES.map((ex) => (
                 <button key={ex} onClick={() => onExample(ex)} className="rounded-full border border-border px-3 py-1.5 text-[13px] text-muted transition hover:border-accent hover:text-fg">{ex}</button>
               ))}
+              <button onClick={onSurprise} className="ml-auto hidden text-sm text-muted transition hover:text-fg md:inline">surprise me</button>
             </div>
-            <button onClick={onSurprise} className="block w-full text-center text-sm text-muted transition hover:text-fg">surprise me</button>
+            <button onClick={onSurprise} className="block w-full text-center text-sm text-muted transition hover:text-fg md:hidden">surprise me</button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
@@ -147,7 +148,7 @@ export default function ConversationPanel({
             rows={3}
             className={`min-h-[92px] w-full resize-none rounded-xl border px-3 pb-11 pt-2.5 text-sm leading-relaxed outline-none focus:border-accent md:min-h-[150px] ${inputBase}`}
           />
-          <button type="submit" className="absolute bottom-2 right-2 rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-bg transition hover:brightness-110">send</button>
+          <button type="submit" className="absolute bottom-3 right-3 rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-bg transition hover:brightness-110">send</button>
         </form>
       </div>
 
