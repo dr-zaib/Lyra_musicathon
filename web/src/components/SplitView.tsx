@@ -139,6 +139,10 @@ export default function SplitView() {
   // current track's mood, then a soft violet.
   const moodMacro = useMemo<MacroNode | null>(() => dominantOf(distribution) ?? currentEmotion, [distribution, currentEmotion]);
   const moodColor = moodMacro ? TAXONOMY[moodMacro].color : "#5a4d8a";
+  // the compass needle points to the LAST emotion you touched (your current heading), not
+  // the buffer-weighted dominant — so clicking an emotion rotates the dial to it right away.
+  const lastPick = picks.length ? picks[picks.length - 1] : null;
+  const compassColor = lastPick ? TAXONOMY[lastPick].color : moodColor;
 
   // subtle pointer parallax on the ambient aura (a fixed layer → zero layout impact): the
   // background glow drifts opposite the cursor, so it reads as depth behind the wheel.
@@ -547,7 +551,7 @@ export default function SplitView() {
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="flex min-h-0 flex-1 items-center justify-center">
               {!viewResolved ? null : compassMode ? (
-                <div className="h-full w-full"><CompassScene dominant={moodMacro} moodColor={moodColor} comprehension={comprehension} trail={pickHistory.length ? pickHistory : picks} onSelect={pickEmotion} /></div>
+                <div className="h-full w-full"><CompassScene dominant={lastPick} moodColor={compassColor} comprehension={comprehension} trail={pickHistory.length ? pickHistory : picks} onSelect={pickEmotion} /></div>
               ) : (
                 <div className="relative aspect-square h-full max-h-[900px]">
                   <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />

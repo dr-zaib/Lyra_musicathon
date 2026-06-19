@@ -152,7 +152,7 @@ export default function ConversationPanel({
             rows={3}
             className={`min-h-[92px] w-full resize-none rounded-xl border px-3 pb-11 pt-2.5 text-sm leading-relaxed outline-none focus:border-accent md:min-h-[150px] ${inputBase}`}
           />
-          <button type="submit" className="absolute bottom-3 right-3 rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-bg transition hover:brightness-110">send</button>
+          <button type="submit" className="absolute bottom-2.5 right-2.5 rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-bg transition hover:brightness-110">send</button>
         </form>
       </div>
 
