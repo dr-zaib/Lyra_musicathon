@@ -96,7 +96,7 @@ export default function PlayerBar({
   const ctrl = "flex h-12 w-12 items-center justify-center rounded-full text-muted transition hover:text-fg disabled:opacity-30";
 
   return (
-    <div className="sticky bottom-0 z-20 border-t border-border bg-bg-elev/90 backdrop-blur">
+    <div className="sticky bottom-0 z-20 border-t border-border/60 bg-bg-elev/25 backdrop-blur-xl">
       {/* a slim seek line flush at the top edge (interactive: click/drag to scrub) */}
       <Seek currentTime={currentTime} duration={duration} onSeek={onSeek} className="w-full" />
 
