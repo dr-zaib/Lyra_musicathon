@@ -165,6 +165,7 @@ export default function EmotionWheel({
                 <text
                   fontSize={rd((big ? 4.3 : 2.9) * (hot ? 1.08 : 1))}
                   className="font-display"
+                  dominantBaseline="central"
                   fill={color}
                   opacity={lit ? 1 : 0.72}
                   style={{
