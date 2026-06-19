@@ -70,15 +70,15 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
       return new THREE.Vector3(Math.cos(a) * rr, Math.sin(a) * rr, 0.1);
     });
   }, [trail]);
-  // the trail as a glowing tube (thin WebGL lines are 1px and get lost). It flows through
-  // the COLOURS of the emotions it visits, and fades along its length (oldest dim → newest
-  // bright); additive blending makes it glow.
+  // the trail as a CONSTELLATION: a thin glowing line through the emotion nodes (a node dot
+  // is drawn at each below). Flows through the emotions' colours and fades along its length
+  // (oldest dim → newest bright); additive blending makes it glow.
   const trailTube = useMemo(() => {
     const n = trailPts.length;
     if (n < 2) return null;
-    const curve = new THREE.CatmullRomCurve3(trailPts, false, "catmullrom", 0.3);
-    const TUB = 100, RAD = 8;
-    const geo = new THREE.TubeGeometry(curve, TUB, 0.15, RAD, false);
+    const curve = new THREE.CatmullRomCurve3(trailPts, false, "catmullrom", 0.4);
+    const RAD = 6, TUB = 100;
+    const geo = new THREE.TubeGeometry(curve, TUB, 0.06, RAD, false); // thin (constellation), smooth + robust
     const emoCols = trail.map((m) => new THREE.Color(TAXONOMY[m].color));
     const pos = geo.attributes.position;
     const cols = new Float32Array(pos.count * 3);
@@ -137,18 +137,24 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
             <mesh position={[x, y, 0.05]}><sphereGeometry args={[isDom ? 0.32 : 0.16, 16, 16]} /><meshBasicMaterial color={col} /></mesh>
             {/* invisible but raycastable hit area for comfortable clicking */}
             {interactive && <mesh position={[x * 1.1, y * 1.1, 0.4]}><sphereGeometry args={[1.3, 10, 10]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>}
-            <Label text={m.toLowerCase()} color={col} position={[x * 1.13, y * 1.13, 0.4]} big={isDom} />
+            <Label text={m.toLowerCase()} color={col} position={[x * 1.2, y * 1.2, 0.6]} big={isDom} />
           </group>
         );
       })}
 
-      {/* constellation trail of the recent emotional path — glowing tube, tail fades out */}
+      {/* constellation trail: thin polyline + a glowing node at each emotion */}
       {trailTube && (
         <mesh>
           <primitive object={trailTube} attach="geometry" />
           <meshBasicMaterial vertexColors transparent depthWrite={false} blending={THREE.AdditiveBlending} />
         </mesh>
       )}
+      {trailPts.map((p, i) => (
+        <mesh key={`tn-${i}`} position={[p.x, p.y, p.z]}>
+          <sphereGeometry args={[0.14, 12, 12]} />
+          <meshBasicMaterial color={TAXONOMY[trail[i]].color} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+        </mesh>
+      ))}
 
       {/* centre core = intensity, coloured to the dominant mood (grey until chosen).
           Additive halos give it a glow now that the full-screen bloom is gone. */}
