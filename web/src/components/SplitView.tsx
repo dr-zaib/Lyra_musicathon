@@ -12,13 +12,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { AnimatePresence, motion } from "motion/react";
 
 import ConversationPanel, { type Msg } from "./ConversationPanel";
 import EmotionWheel from "./EmotionWheel";
+import KeyboardMock from "./KeyboardMock";
 import LyricBanner from "./LyricBanner";
 import PlayerBar from "./PlayerBar";
 import PlaylistView from "./PlaylistView";
 import Settings, { type PlaybackSettings, defaultLanguage } from "./Settings";
+import { hasWebGL } from "@/lib/webgl";
 import { TAXONOMY } from "@/lib/taxonomy";
 import type {
   AgentTurn,
@@ -95,6 +98,10 @@ export default function SplitView() {
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [compassMode, setCompassMode] = useState(false); // 3D compass is the default view; ?view=2d falls back to the 2.5D wheel
   const [viewResolved, setViewResolved] = useState(false); // gate the left viz until the mode is known (no 2.5D flash)
+  const [isMobile, setIsMobile] = useState(false); // < md: drives WHICH compass canvas mounts (only one runs at a time)
+  const [webglOK, setWebglOK] = useState(true); // optimistic; corrected on mount → falls back to the 2.5D wheel if false
+  const [composing, setComposing] = useState(false); // mobile: the input is focused (keyboard up) → lift the box above the keyboard
+  const [keyboardH, setKeyboardH] = useState(290); // keyboard reserve: the REAL height when measurable, else a ~290px mock rectangle (preview / no visualViewport)
 
   // emotions → wheel (FIFO buffer of the last 3 presses). The shape derives from this.
   const [picks, setPicks] = useState<MacroNode[]>([]);
@@ -144,6 +151,10 @@ export default function SplitView() {
   // the buffer-weighted dominant — so clicking an emotion rotates the dial to it right away.
   const lastPick = picks.length ? picks[picks.length - 1] : null;
   const compassColor = lastPick ? TAXONOMY[lastPick].color : moodColor;
+  // the 3D compass is the default; fall back to the 2.5D wheel when it's off (?view=2d) or
+  // the device has no WebGL. The mobile/desktop blocks each gate their own canvas on isMobile
+  // so only the visible one ever mounts.
+  const useCompass = compassMode && webglOK;
 
   // subtle pointer parallax on the ambient aura (a fixed layer → zero layout impact): the
   // background glow drifts opposite the cursor, so it reads as depth behind the wheel.
@@ -184,8 +195,43 @@ export default function SplitView() {
     if (typeof window !== "undefined") {
       const v = new URLSearchParams(window.location.search).get("view");
       setCompassMode(v !== "2d" && v !== "wheel"); // 3D compass is the DEFAULT; ?view=2d forces the 2.5D wheel (WebGL fallback)
+      setWebglOK(hasWebGL()); // no WebGL → 2.5D wheel everywhere
     }
     setViewResolved(true);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // track the md breakpoint so only the visible layout's compass canvas mounts (a hidden r3f
+  // canvas would keep running its frame loop). Tailwind md = 768px → mobile is < 768.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // mobile keyboard: measure its height from the visual viewport (innerHeight − visible height)
+  // so the mock-keyboard reserve matches the REAL keyboard on a device; keep the ~290px mock
+  // default when nothing is up (so the composing layout is right in preview too).
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const kb = Math.round(window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardH(kb > 120 ? kb : 290);
+    };
+    onResize();
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", onResize);
+    return () => { vv.removeEventListener("resize", onResize); vv.removeEventListener("scroll", onResize); };
+  }, []);
+
+  // dev/demo: ?compose=1 forces the composing (keyboard-up) layout so it can be screenshotted
+  // without a real keyboard. Inert otherwise.
+  /* eslint-disable react-hooks/set-state-in-effect -- one-shot dev hook from the URL */
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("compose") === "1") setComposing(true);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -429,6 +475,8 @@ export default function SplitView() {
     onMode: chooseMode,
     onReset: reset,
     canReset: playing || picks.length > 0,
+    composing,
+    onComposingChange: setComposing,
   };
 
   const player = playing ? (
@@ -441,15 +489,22 @@ export default function SplitView() {
     />
   ) : null;
 
-  // emotion progress — lives under the wheel (where you pick), not in the input box
+  // pick progress — split in two on mobile: the DOTS sit under the wheel as a "loading" of the
+  // 3 slots (empty dots pulse in a wave; filled = solid accent), while the STATUS TEXT moves up
+  // top by the wordmark (Alberto's layout). Desktop still shows them stacked together (pips).
+  const pipsDots = (
+    <div className="flex justify-center gap-2">
+      {Array.from({ length: MAX_PICKS }).map((_, i) => {
+        const filled = i < picks.length;
+        return <span key={i} className={`h-2.5 w-2.5 rounded-full ${filled ? "bg-accent" : "bg-bg-elev-2 lyra-pip-load"}`} style={filled ? undefined : { animationDelay: `${i * 0.18}s` }} />;
+      })}
+    </div>
+  );
+  const pickStatusText = picks.length === 0 ? "tap 3 · or just the same one" : picks.length < MAX_PICKS ? `tap ${MAX_PICKS - picks.length} more to play` : "playing";
   const pips = (
     <div className="flex flex-col items-center gap-2">
-      <div className="flex gap-2">
-        {Array.from({ length: MAX_PICKS }).map((_, i) => (
-          <span key={i} className={`h-2.5 w-2.5 rounded-full transition ${i < picks.length ? "bg-accent" : "bg-bg-elev-2"}`} />
-        ))}
-      </div>
-      <span className="text-sm text-muted-2">{picks.length === 0 ? "tap 3 · or just the same one" : picks.length < MAX_PICKS ? `tap ${MAX_PICKS - picks.length} more to play` : "playing"}</span>
+      {pipsDots}
+      <span className="text-sm text-muted-2">{pickStatusText}</span>
     </div>
   );
 
@@ -501,40 +556,86 @@ export default function SplitView() {
         <PlaylistView items={queue} index={index} onJump={(i) => { setIndex(i); setPlaylistOpen(false); }} onClose={() => setPlaylistOpen(false)} />
       )}
 
-      {/* ===== MOBILE ===== */}
-      <div className="relative flex h-screen flex-col overflow-hidden md:hidden">
-        <div className="absolute right-4 top-4 z-30">{settingsBtn}</div>
-        {/* the wheel builds its shape in the background — also the scroll/swipe skip surface */}
+      {/* ===== MOBILE — compass-first, a clean flex column (no absolute panel → no clipping).
+              header · compass hero · pips · conversation · player. Height tracks the visual
+              viewport so the input rides above the keyboard. While composing (keyboard up) the
+              hero takes the room and everything but the wheel + input is stripped away. ===== */}
+      <div className="relative flex h-[100dvh] flex-col overflow-hidden md:hidden">
+        {/* header — wordmark + the two guidance lines (accent: they explain the app). This whole
+            top block (header + wheel + dots) stays PUT; only the area below it reacts to the
+            keyboard. Padding pulls the wordmark/settings off the screen edges (+ notch). */}
+        <header className="relative z-30 shrink-0 px-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
+          <div className="flex items-start justify-between gap-3">
+            <span className="font-display text-2xl font-medium lowercase leading-none tracking-tight">lyra<span className="text-accent">.</span></span>
+            {settingsBtn}
+          </div>
+          <div className="mt-2.5 min-h-5 space-y-1.5 text-center">
+            {playing ? (
+              <LyricBanner verse={current?.verse ?? null} mock={false} />
+            ) : (
+              <>
+                {/* the welcome title fades UP and out once you start (a pick) — a soft exit, not a pop */}
+                <AnimatePresence>
+                  {picks.length === 0 && (
+                    <motion.p
+                      key="title"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.4, ease: "easeOut" }}
+                      className="font-display text-[17px] lowercase leading-tight text-accent"
+                    >
+                      tell lyra your mood, get a playlist.
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+                <p className="text-[13px] font-medium text-accent/75">{pickStatusText}</p>
+                {/* the 3 slots sit right under the guidance text (the dots ARE "tap 3"); empty
+                    ones pulse like a loader until all three are filled */}
+                <div className="pt-0.5">{pipsDots}</div>
+              </>
+            )}
+          </div>
+        </header>
+
+        {/* the wheel — FIXED size, identical in every state, so the top never jumps or resizes
+            (and never enlarges when the keyboard opens). Also the swipe/scroll skip surface. */}
         <div
-          className="pointer-events-auto absolute left-1/2 top-[34%] aspect-square w-[124vw] max-w-[480px] -translate-x-1/2 -translate-y-1/2 opacity-70"
+          className={`relative z-10 shrink-0 transition-[height] duration-500 ${playing ? "h-[46vh]" : "h-[42vh]"}`}
           onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         >
-          <div className="lyra-breathe h-full w-full">
-            <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape faintShape onSelect={pickEmotion} />
-          </div>
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-bg via-bg/85 to-transparent" />
-
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-          <div className="px-5 pt-6">
-            <div className="font-display text-2xl font-medium lowercase leading-none tracking-tight">
-              lyra<span className="text-accent">.</span>
+          {!viewResolved ? null : useCompass && isMobile ? (
+            <CompassScene portrait dominant={lastPick} moodColor={compassColor} comprehension={comprehension} trail={pickHistory.length ? pickHistory : picks} onSelect={pickEmotion} />
+          ) : (
+            <div className="absolute left-1/2 top-1/2 aspect-square w-[118vw] max-w-[440px] -translate-x-1/2 -translate-y-1/2">
+              <div className="lyra-breathe h-full w-full">
+                <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape onSelect={pickEmotion} />
+              </div>
             </div>
-            <div className="mt-1"><LyricBanner verse={current?.verse ?? null} /></div>
-          </div>
-          <div className="min-h-0 flex-1">
-            <ConversationPanel variant="floating" {...convoProps} />
-          </div>
+          )}
         </div>
 
-        {showSkipHint && (
+        {/* below the wheel: cold → conversation fills the rest; composing → the input lifts into
+            the saved middle space and a MOCK iOS KEYBOARD (real height when measurable) takes the
+            bottom. Only this lower region moves — the wheel/header above stay put. */}
+        {composing ? (
+          <>
+            <div className="min-h-0 flex-1" />
+            <div className="relative z-10 shrink-0"><ConversationPanel variant="floating" {...convoProps} /></div>
+            <div className="shrink-0" style={{ height: keyboardH }}><KeyboardMock /></div>
+          </>
+        ) : (
+          <div className="relative z-10 min-h-0 flex-1"><ConversationPanel variant="floating" {...convoProps} /></div>
+        )}
+
+        {showSkipHint && !composing && (
           <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center">
             <span className="animate-fade-up rounded-full border border-white/10 bg-bg-elev/80 px-3 py-1.5 text-[11px] text-muted backdrop-blur-sm">
               swipe up for the next ↑
             </span>
           </div>
         )}
-        {player && <div className="relative z-20 shrink-0">{player}</div>}
+        {player && !composing && <div className="relative z-20 shrink-0">{player}</div>}
       </div>
 
       {/* ===== DESKTOP ===== */}
@@ -556,7 +657,7 @@ export default function SplitView() {
             {/* the cited lyric, above the wheel */}
             <div className="flex shrink-0 justify-center px-6 pt-1"><div className="w-full max-w-[440px]"><LyricBanner verse={current?.verse ?? null} /></div></div>
             <div className="flex min-h-0 flex-1 items-center justify-center">
-              {!viewResolved ? null : compassMode ? (
+              {!viewResolved ? null : useCompass && !isMobile ? (
                 <div className="h-full w-full"><CompassScene dominant={lastPick} moodColor={compassColor} comprehension={comprehension} trail={pickHistory.length ? pickHistory : picks} onSelect={pickEmotion} /></div>
               ) : (
                 <div className="relative aspect-square h-full max-h-[900px]">

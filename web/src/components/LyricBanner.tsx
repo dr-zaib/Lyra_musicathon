@@ -13,14 +13,15 @@ const MOCK = [
   "morning light on an unmade bed",
 ];
 
-export default function LyricBanner({ verse }: { verse: string | null }) {
+export default function LyricBanner({ verse, mock = true }: { verse: string | null; mock?: boolean }) {
   const [i, setI] = useState(0);
   useEffect(() => {
-    if (verse) return; // a real cited verse takes over
+    if (verse || !mock) return; // a real cited verse takes over; with mock off we show nothing
     const id = setInterval(() => setI((n) => (n + 1) % MOCK.length), 4500);
     return () => clearInterval(id);
-  }, [verse]);
-  const text = verse ?? MOCK[i];
+  }, [verse, mock]);
+  const text = verse ?? (mock ? MOCK[i] : null);
+  if (!text) return <div className="h-5" />; // hold the line's height so layout doesn't jump
   return (
     <div className="relative h-5 overflow-hidden">
       <AnimatePresence mode="wait">

@@ -62,6 +62,8 @@ export default function ConversationPanel({
   onMode,
   onReset,
   canReset,
+  composing = false,
+  onComposingChange,
 }: {
   variant: "panel" | "floating";
   messages: Msg[];
@@ -77,9 +79,14 @@ export default function ConversationPanel({
   onMode: (shape: TrajectoryShape) => void;
   onReset: () => void;
   canReset: boolean;
+  composing?: boolean;
+  onComposingChange?: (v: boolean) => void;
 }) {
   const floating = variant === "floating";
   const cold = !playing && messages.length === 0;
+  // mobile + keyboard up: strip everything but the input so only the wheel (above) + the
+  // box are on screen. Desktop (panel) is never minimal — it always has the room.
+  const minimal = floating && composing;
 
   // keep the feed pinned to the newest message — new lines push older ones up
   const feedRef = useRef<HTMLDivElement>(null);
@@ -95,47 +102,54 @@ export default function ConversationPanel({
   return (
     <div className="flex h-full min-h-0 flex-col p-4 pb-5">
       {/* reset (start over) — top-right */}
-      {canReset && (
+      {canReset && !minimal && (
         <div className="flex justify-end">
           <button onClick={onReset} aria-label="start over" title="start over" className="flex h-8 w-8 items-center justify-center rounded-full text-base text-muted transition hover:bg-bg-elev hover:text-fg">↺</button>
         </div>
       )}
 
-      {/* narration feed — fills the top */}
-      <div ref={feedRef} className="no-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto py-2">
-        {cold ? (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: "easeOut" }}
-            className={`flex h-full flex-col text-center ${floating ? "justify-start pt-[19vh]" : "justify-start pt-[7vh]"}`}
-          >
-            <h1 className="font-display text-[1.7rem] font-medium lowercase leading-[1.15] tracking-tight text-fg">tell lyra your mood,<br />get a playlist.</h1>
-            <p className="mx-auto mt-2 max-w-[20rem] text-sm text-muted">{floating ? "three emotions — just tell me how you feel." : "three emotions — type them, or tap them on the wheel."}</p>
-          </motion.div>
-        ) : (
-          messages.map((m, i) =>
-            m.text.trim() ? (
-              <motion.div key={i} {...ENTER} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.role === "agent" ? agentBubble : userBubble}`}>{m.text}</motion.div>
-            ) : null,
-          )
-        )}
-        {pending && <ThinkingIndicator floating={floating} />}
-      </div>
+      {/* narration feed. MOBILE shows NO message box (Alberto) — just a spacer so the input
+          stays at the bottom; the compass + player carry the experience there. DESKTOP keeps
+          the cold hero + the agent narration. Both hidden while composing. */}
+      {!minimal && (floating ? (
+        <div className="min-h-0 flex-1" />
+      ) : (
+        <div ref={feedRef} className="no-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto py-2">
+          {cold ? (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: "easeOut" }}
+              className="flex h-full flex-col justify-start pt-3 text-center"
+            >
+              <h1 className="font-display text-[1.7rem] font-medium lowercase leading-[1.15] tracking-tight text-fg">tell lyra your mood,<br />get a playlist.</h1>
+              <p className="mx-auto mt-2 max-w-[20rem] text-sm text-muted">three emotions — type them, or tap them on the wheel.</p>
+            </motion.div>
+          ) : (
+            messages.map((m, i) =>
+              m.text.trim() ? (
+                <motion.div key={i} {...ENTER} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.role === "agent" ? agentBubble : userBubble}`}>{m.text}</motion.div>
+              ) : null,
+            )
+          )}
+          {pending && <ThinkingIndicator floating={floating} />}
+        </div>
+      ))}
 
       {/* the input bar — the big "describe" box + the steer. A hairline rule sets it apart
-          from the chat above (clear "this is the conversation / these are the controls"). */}
-      <div className="shrink-0 space-y-2 border-t border-border pt-3">
-        {/* cold: example moods + surprise · playing: the steer pills (lit by mode) */}
-        {!playing ? (
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-center gap-2">
+          from the chat above (clear "this is the conversation / these are the controls").
+          While composing only the box remains. */}
+      <div className={`shrink-0 space-y-2 ${minimal ? "" : "border-t border-border pt-3"}`}>
+        {/* cold: example moods + surprise · playing: the steer pills (lit by mode) — both hidden while composing */}
+        {minimal ? null : !playing ? (
+          <div className={`space-y-2 ${floating ? "mx-auto w-[95%]" : ""}`}>
+            <div className={`flex flex-nowrap items-center justify-center ${floating ? "gap-1.5" : "flex-wrap gap-2"}`}>
               {EXAMPLES.map((ex) => (
-                <button key={ex} onClick={() => onExample(ex)} className="rounded-full border border-border px-3 py-1.5 text-[13px] text-muted transition hover:border-accent hover:text-fg">{ex}</button>
+                <button key={ex} onClick={() => onExample(ex)} className={`whitespace-nowrap rounded-full border border-border text-muted transition hover:border-accent hover:text-fg ${floating ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-[13px]"}`}>{ex}</button>
               ))}
             </div>
             <button onClick={onSurprise} className="block w-full text-center text-sm text-muted transition hover:text-fg">surprise me</button>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={`flex flex-wrap items-center gap-2 ${floating ? "mx-auto w-[95%]" : ""}`}>
             {MODES.map((m) => {
               const active = mode === m.key;
               return (
@@ -149,22 +163,25 @@ export default function ConversationPanel({
         )}
 
         {/* describe your mood — send lives inside, bottom-right (shorter on mobile, tall on desktop) */}
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="relative">
+        <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className={`relative ${floating ? "mx-auto w-[95%]" : ""}`}>
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onFocus={() => onComposingChange?.(true)}
+            onBlur={() => onComposingChange?.(false)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmit(); } }}
             placeholder="describe how you feel…"
             aria-label="describe your mood"
             rows={3}
-            className={`min-h-[92px] w-full resize-none rounded-xl border px-3 pb-11 pt-2.5 text-sm leading-relaxed outline-none focus:border-accent md:min-h-[150px] ${inputBase}`}
+            className={`w-full resize-none rounded-xl border px-3 pb-11 pt-2.5 text-sm leading-relaxed outline-none focus:border-accent md:min-h-[150px] ${minimal || (floating && playing) ? "min-h-[64px]" : "min-h-[92px]"} ${inputBase}`}
           />
           <button type="submit" className="absolute bottom-3 right-2 rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-bg transition hover:brightness-110">send</button>
         </form>
       </div>
 
-      {/* lyra's read — the very last element */}
-      <div className="shrink-0 pt-3">
+      {/* lyra's read — the very last element. Hidden while composing, and on mobile while
+          playing (it's maxed out and uninformative there → reclaim the space). */}
+      <div className={`shrink-0 pt-3 ${minimal || (floating && playing) ? "hidden" : ""}`}>
         <div className="mb-1 flex justify-between text-[11px] text-muted-2">
           <span>lyra’s read on you</span>
           <span className="text-muted">{readLabel(comprehension)}</span>

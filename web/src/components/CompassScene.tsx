@@ -46,12 +46,16 @@ const Label = forwardRef<THREE.Sprite, { text: string; color: string; position: 
   },
 );
 
-function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
-  dominant: MacroNode | null; moodColor: string; comprehension: number; trail: MacroNode[]; onSelect?: (m: MacroNode) => void;
+function Dial({ dominant, moodColor, comprehension, trail, onSelect, portrait }: {
+  dominant: MacroNode | null; moodColor: string; comprehension: number; trail: MacroNode[]; onSelect?: (m: MacroNode) => void; portrait?: boolean;
 }) {
+  // labels sit a touch further out only in portrait (mobile) — on desktop the wider spread
+  // collided with the disc, so it stays at the original 1.2 there.
+  const LR = portrait ? 1.3 : 1.2;
   const ref = useRef<THREE.Group>(null);
   const inited = useRef(false);
   const labelRefs = useRef<Array<THREE.Sprite | null>>([]);
+  const hoveredRef = useRef<number | null>(null); // which emotion is hovered → its label grows
   const reduced = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
   const target = dominant ? DIAL_F * (-Math.PI / 2 - baseAngle(idxOf(dominant))) : 0; // dominant → SOUTH (needle points at the viewer)
   // useFrame OWNS rotation.z (the JSX must NOT set rotation-z, or React would re-apply it
@@ -67,9 +71,9 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
       d = Math.atan2(Math.sin(d), Math.cos(d));
       g.rotation.z += d * Math.min(1, dt * 2.4);
     }
-    // size each label by how close it sits to the fixed north needle: the one under the
-    // needle is the largest, the far ones shrink — so the emotions already in focus read big
-    // and feel the most clickable.
+    // size each label by how close it sits to the fixed needle: the one under the needle is
+    // the largest, the far ones shrink — so the emotions in focus read bigger. A hovered label
+    // grows a touch. Scale is eased toward its target so hover + rotation both feel smooth.
     const rot = g.rotation.z;
     for (let i = 0; i < N; i++) {
       const sp = labelRefs.current[i];
@@ -77,8 +81,10 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
       let a = baseAngle(i) + rot + Math.PI / 2; // distance from the SOUTH needle (-π/2)
       a = Math.abs(Math.atan2(Math.sin(a), Math.cos(a))); // 0 at the needle → π opposite
       const t = a / Math.PI;
-      const s = 8.4 - 3.8 * t; // 8.4 under the needle → 4.6 at the far side
-      sp.scale.set(s, s / 4, 1);
+      const hov = hoveredRef.current === i ? 1.18 : 1;
+      const s = (6.2 - 1.9 * t) * hov; // 6.2 under the needle → 4.3 at the far side (× hover)
+      const ns = sp.scale.x + (s - sp.scale.x) * Math.min(1, dt * 12);
+      sp.scale.set(ns, ns / 4, 1);
     }
   });
 
@@ -150,13 +156,13 @@ function Dial({ dominant, moodColor, comprehension, trail, onSelect }: {
           <group
             key={m}
             onClick={interactive ? (e) => { e.stopPropagation(); onSelect!(m); } : undefined}
-            onPointerOver={interactive ? () => { document.body.style.cursor = "pointer"; } : undefined}
-            onPointerOut={interactive ? () => { document.body.style.cursor = ""; } : undefined}
+            onPointerOver={(e) => { e.stopPropagation(); hoveredRef.current = i; if (interactive) document.body.style.cursor = "pointer"; }}
+            onPointerOut={() => { hoveredRef.current = null; if (interactive) document.body.style.cursor = ""; }}
           >
             <mesh position={[x, y, 0.05]}><sphereGeometry args={[isDom ? 0.32 : 0.16, 16, 16]} /><meshBasicMaterial color={col} /></mesh>
             {/* invisible but raycastable hit area for comfortable clicking */}
             {interactive && <mesh position={[x * 1.1, y * 1.1, 0.4]}><sphereGeometry args={[1.3, 10, 10]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>}
-            <Label ref={(el) => { labelRefs.current[i] = el; }} text={m.toLowerCase()} color={col} position={[x * 1.2, y * 1.2, 0.6]} />
+            <Label ref={(el) => { labelRefs.current[i] = el; }} text={m.toLowerCase()} color={col} position={[x * LR, y * LR, 0.6]} />
           </group>
         );
       })}
@@ -208,20 +214,38 @@ function Needle({ dominant }: { dominant: MacroNode | null }) {
   );
 }
 
-export default function CompassScene({ dominant, moodColor, comprehension, trail, onSelect }: {
-  dominant: MacroNode | null; moodColor: string; comprehension: number; trail: MacroNode[]; onSelect?: (m: MacroNode) => void;
+// Two framings of the same scene. Landscape = the wide desktop column (disc pushed left,
+// shallow angle). Portrait = a tall phone: disc centred, camera further back so it fits the
+// narrow width, slightly smaller. Tune these by eye on a real device — they're just numbers.
+type Layout = {
+  camera: [number, number, number];
+  lookAt: [number, number, number];
+  fov: number;
+  groupRot: number;
+  groupPos: [number, number, number];
+  groupScale: number;
+};
+const LAYOUT: Record<"landscape" | "portrait", Layout> = {
+  landscape: { camera: [-3, 7, 23], lookAt: [-2, 0.5, -2], fov: 50, groupRot: -1.0, groupPos: [-2, 1.8, -2], groupScale: 0.9 },
+  portrait: { camera: [0, 7, 26], lookAt: [0, 0.1, 0], fov: 52, groupRot: -0.95, groupPos: [0, 3.1, 0], groupScale: 0.64 },
+};
+
+export default function CompassScene({ dominant, moodColor, comprehension, trail, onSelect, portrait = false }: {
+  dominant: MacroNode | null; moodColor: string; comprehension: number; trail: MacroNode[]; onSelect?: (m: MacroNode) => void; portrait?: boolean;
 }) {
+  const L = portrait ? LAYOUT.portrait : LAYOUT.landscape;
   return (
     <Canvas
-      camera={{ position: [-3, 7, 23], fov: 50 }}
-      onCreated={({ camera }) => camera.lookAt(-2, 0.5, -2)}
+      key={portrait ? "portrait" : "landscape"} // the camera prop only applies at mount → remount if the framing changes
+      camera={{ position: L.camera, fov: L.fov }}
+      onCreated={({ camera }) => camera.lookAt(L.lookAt[0], L.lookAt[1], L.lookAt[2])}
       gl={{ antialias: true, alpha: true }}
       dpr={[1, 2]}
       style={{ width: "100%", height: "100%", background: "transparent" }}
     >
       <ambientLight intensity={0.6} />
-      <group rotation-x={-1.0} position={[-2, 1.8, -2]} scale={0.9}>
-        <Dial dominant={dominant} moodColor={moodColor} comprehension={comprehension} trail={trail} onSelect={onSelect} />
+      <group rotation-x={L.groupRot} position={L.groupPos} scale={L.groupScale}>
+        <Dial dominant={dominant} moodColor={moodColor} comprehension={comprehension} trail={trail} onSelect={onSelect} portrait={portrait} />
         <Needle dominant={dominant} />
       </group>
     </Canvas>

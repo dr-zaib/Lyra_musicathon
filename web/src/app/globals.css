@@ -141,6 +141,15 @@ body::before {
   animation-delay: 0.3s;
 }
 
+/* pick slots as a loading indicator: the still-empty dots pulse in a wave (game "loading…"
+   feel) so they read as "waiting to be filled"; a filled dot is solid accent and still. The
+   per-dot animation-delay is set inline so the wave runs left→right. */
+@keyframes lyra-pip-load {
+  0%, 100% { transform: scale(0.72); opacity: 0.3; }
+  45% { transform: scale(1.15); opacity: 0.85; }
+}
+.lyra-pip-load { animation: lyra-pip-load 1.15s ease-in-out infinite; }
+
 /* hidden scrollbar — the chat feed scrolls but never shows a bar (and no flash on
    state changes); content stays in its own container, never over the controls. */
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
