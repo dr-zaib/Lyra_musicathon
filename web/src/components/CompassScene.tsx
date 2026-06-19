@@ -6,7 +6,6 @@
 // Kept flat (no vertical climb): depth is the journey, not height. Client-only (ssr:false).
 
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Stars } from "@react-three/drei";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -28,7 +27,7 @@ function makeTextTexture(text: string, color: string) {
   c.width = 256; c.height = 64;
   const x = c.getContext("2d")!;
   x.font = "600 34px Georgia"; x.fillStyle = color; x.textAlign = "center"; x.textBaseline = "middle";
-  x.shadowColor = color; x.shadowBlur = 14;
+  x.shadowColor = color; x.shadowBlur = 3;
   x.fillText(text, 128, 34);
   const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
   return t;
@@ -64,6 +63,16 @@ function Dial({ dominant, moodColor, comprehension, picks }: {
   }, [picks]);
   const trailGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints(trailPts), [trailPts]);
 
+  // faint constellation spokes from the centre to each emotion (the "rays" Alberto liked)
+  const spokeGeo = useMemo(() => {
+    const pts: THREE.Vector3[] = [];
+    WHEEL_ORDER.forEach((_, i) => {
+      const a = baseAngle(i);
+      pts.push(new THREE.Vector3(0, 0, 0.02), new THREE.Vector3(Math.cos(a) * R, Math.sin(a) * R, 0.02));
+    });
+    return new THREE.BufferGeometry().setFromPoints(pts);
+  }, []);
+
   const coreR = 0.5 + comprehension * 1.0;
 
   return (
@@ -72,6 +81,12 @@ function Dial({ dominant, moodColor, comprehension, picks }: {
       <mesh><ringGeometry args={[R - 0.05, R + 0.05, 100]} /><meshBasicMaterial color="#6a5fae" transparent opacity={0.4} side={THREE.DoubleSide} /></mesh>
       <mesh><ringGeometry args={[R * 0.6 - 0.04, R * 0.6 + 0.04, 80]} /><meshBasicMaterial color="#6a5fae" transparent opacity={0.22} side={THREE.DoubleSide} /></mesh>
       <mesh><circleGeometry args={[R, 80]} /><meshBasicMaterial color="#140d24" transparent opacity={0.45} side={THREE.DoubleSide} /></mesh>
+
+      {/* constellation spokes */}
+      <lineSegments>
+        <primitive object={spokeGeo} attach="geometry" />
+        <lineBasicMaterial color="#4a4070" transparent opacity={0.2} />
+      </lineSegments>
 
       {/* 12 emotion markers + labels */}
       {WHEEL_ORDER.map((m, i) => {
@@ -103,11 +118,12 @@ function Dial({ dominant, moodColor, comprehension, picks }: {
 
 function Needle() {
   // fixed at north (does NOT rotate with the dial)
-  const len = R * 0.9;
+  const len = R * 0.86;
   return (
     <group>
-      <mesh position={[0, len / 2, 0.25]}><coneGeometry args={[0.55, len, 4]} /><meshBasicMaterial color="#E8C36B" /></mesh>
-      <mesh position={[0, R + 0.7, 0.25]}><sphereGeometry args={[0.3, 16, 16]} /><meshBasicMaterial color="#fff3d6" /></mesh>
+      {/* sleek round spire (was a 4-sided pyramid → squared) */}
+      <mesh position={[0, len / 2, 0.3]}><coneGeometry args={[0.17, len, 24]} /><meshBasicMaterial color="#E8C36B" /></mesh>
+      <mesh position={[0, R + 0.7, 0.3]}><sphereGeometry args={[0.26, 20, 20]} /><meshBasicMaterial color="#fff3d6" /></mesh>
     </group>
   );
 }
@@ -123,16 +139,15 @@ export default function CompassScene({ dominant, moodColor, comprehension, picks
       dpr={[1, 2]}
       style={{ width: "100%", height: "100%" }}
     >
-      <color attach="background" args={["#070510"]} />
-      <fogExp2 attach="fog" args={["#0a0716", 0.018]} />
+      <color attach="background" args={["#080611"]} />
+      <fogExp2 attach="fog" args={["#0a0716", 0.014]} />
       <ambientLight intensity={0.6} />
-      <Stars radius={120} depth={60} count={1600} factor={3} saturation={0} fade speed={0.5} />
-      <group rotation-x={-1.0} position={[-2, 0.5, -2]}>
+      <group rotation-x={-1.0} position={[-2, 0.5, -2]} scale={0.82}>
         <Dial dominant={dominant} moodColor={moodColor} comprehension={comprehension} picks={picks} />
         <Needle />
       </group>
       <EffectComposer>
-        <Bloom intensity={1.05} luminanceThreshold={0.1} luminanceSmoothing={0.6} mipmapBlur />
+        <Bloom intensity={0.7} luminanceThreshold={0.42} luminanceSmoothing={0.7} mipmapBlur />
       </EffectComposer>
     </Canvas>
   );
