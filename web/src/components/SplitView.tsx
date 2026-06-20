@@ -137,6 +137,9 @@ export default function SplitView() {
   const playedIsrcs = useRef<string[]>([]);
   const autoGenFired = useRef(false);
   const shownReason = useRef<string | null>(null);
+  // where the journey is HEADING (the trajectory's end target) — set on each (re)build.
+  // The compass needle points here while playing, so choosing a mode swings the map.
+  const [heading, setHeading] = useState<MacroNode | null>(null);
 
   // audio
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -187,10 +190,12 @@ export default function SplitView() {
   // current track's mood, then a soft violet.
   const moodMacro = useMemo<MacroNode | null>(() => dominantOf(distribution) ?? currentEmotion, [distribution, currentEmotion]);
   const moodColor = moodMacro ? TAXONOMY[moodMacro].color : "#5a4d8a";
-  // the compass needle points to the LAST emotion you touched (your current heading), not
-  // the buffer-weighted dominant — so clicking an emotion rotates the dial to it right away.
+  // the compass needle: while a journey plays it points to where the journey is HEADING
+  // (the trajectory's end target) so choosing a mode swings the dial; while shaping (not
+  // playing) it points to the last emotion you touched, so a click rotates the dial at once.
   const lastPick = picks.length ? picks[picks.length - 1] : null;
-  const compassColor = lastPick ? TAXONOMY[lastPick].color : moodColor;
+  const compassHeading = (playing && heading) ? heading : lastPick;
+  const compassColor = compassHeading ? TAXONOMY[compassHeading].color : moodColor;
   // the 3D compass is the default; fall back to the 2.5D wheel when it's off (?view=2d) or
   // the device has no WebGL. The mobile/desktop blocks each gate their own canvas on isMobile
   // so only the visible one ever mounts.
@@ -300,7 +305,7 @@ export default function SplitView() {
   // first commit → entry track plays immediately (the journey hides behind it)
   const startPlayback = useCallback(async (forPicks: MacroNode[], message?: string) => {
     setPending(true); autoGenFired.current = false; shownReason.current = null;
-    modeRef.current = "deepen"; setMode("deepen");
+    modeRef.current = "deepen"; setMode("deepen"); setHeading(null);
     const seedDist = freqDistribution(forPicks);
     const seedMood = dominantOf(seedDist);
     let data: EntryResponse;
@@ -382,6 +387,9 @@ export default function SplitView() {
     } catch {
       return;
     }
+    // the compass heading = where this trajectory ends up (so the map swings to the
+    // new direction the moment a mode/emotion change rebuilds the journey).
+    setHeading(dominantOf(traj.steps[traj.steps.length - 1]?.target_distribution) ?? null);
     const at = indexRef.current;
     const curId = queueRef.current[at]?.track.track_id;
     const steps = traj.steps.filter((s) => s.selected_track.track_id !== curId);
@@ -479,7 +487,7 @@ export default function SplitView() {
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     picksRef.current = []; modeRef.current = "deepen";
     setMessages([]);
-    setPicks([]); setMode("deepen"); setPending(false); setShowSkipHint(false);
+    setPicks([]); setMode("deepen"); setHeading(null); setPending(false); setShowSkipHint(false);
     setQueue([]); setIndex(0); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
@@ -647,7 +655,7 @@ export default function SplitView() {
           onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         >
           {!viewResolved ? null : useCompass && isMobile ? (
-            <CompassScene portrait dominant={lastPick} moodColor={compassColor} comprehension={comprehension} trail={picks} onSelect={pickEmotion} />
+            <CompassScene portrait dominant={compassHeading} moodColor={compassColor} comprehension={comprehension} trail={picks} onSelect={pickEmotion} />
           ) : (
             <div className="absolute left-1/2 top-1/2 aspect-square w-[118vw] max-w-[440px] -translate-x-1/2 -translate-y-1/2">
               <div className="lyra-breathe h-full w-full">
@@ -700,7 +708,7 @@ export default function SplitView() {
             <div className="flex shrink-0 justify-center px-6 pt-1"><div className="w-full max-w-[440px]"><LyricBanner verse={current?.verse ?? null} /></div></div>
             <div className="flex min-h-0 flex-1 items-center justify-center">
               {!viewResolved ? null : useCompass && !isMobile ? (
-                <div className="h-full w-full"><CompassScene dominant={lastPick} moodColor={compassColor} comprehension={comprehension} trail={picks} onSelect={pickEmotion} /></div>
+                <div className="h-full w-full"><CompassScene dominant={compassHeading} moodColor={compassColor} comprehension={comprehension} trail={picks} onSelect={pickEmotion} /></div>
               ) : (
                 <div className="relative aspect-square h-full max-h-[900px]">
                   <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
