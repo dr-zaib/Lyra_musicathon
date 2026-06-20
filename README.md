@@ -1,64 +1,96 @@
 # Lyra
 
-Discover music by what it actually says. A lyrics-first agent that moves you
-through an **atlas of emotions** (mood/theme macro-nodes) and walks you from one
-feeling to the next, citing the **line** that marks each passage.
+**Tell Lyra how you feel — it builds a playlist that travels your emotions, choosing songs by what their lyrics actually say.**
 
-## Structure (folder monorepo)
+Most discovery matches the *surface* of music (genre, tempo, audio fingerprint). Lyra matches **meaning**: it reads lyrics, places every track in an emotional space, meets you where you are, and walks you somewhere — citing the **line** that marks each passage.
+
+> Submission copy (one-liner · description · tags): [`SUBMISSION.md`](./SUBMISSION.md)
+
+## How it works
+
+1. **Say how you feel** — pick up to 3 emotions, or type it in plain language (*"restless but quietly hopeful"*). A Claude agent reads the text into the same 3-emotion state.
+2. **Lyra plots a journey** — not a flat list but a *trajectory*: an entry track, then songs that move through the emotional space toward where you're heading.
+3. **Steer live** — *more like this / change the mood / raise the energy* reshape the upcoming queue without interrupting the current track.
+4. **See it** — a 3D **emotional compass** (12-emotion wheel) turns to your dominant feeling and traces the path the playlist takes.
+
+## Live
+
+- **App (frontend):** https://lyra-green-chi.vercel.app
+- **Demo video:** _TBD_
+
+## Architecture
+
+Folder monorepo — boundaries keep the two workstreams conflict-free.
 
 ```
-shared/        Engine <-> agent contract (cross-team source of truth)
-  schema.py      Pydantic models — Axel side
-web/           Next.js frontend + agent layer — Alberto side
-  src/lib/types.ts   TS mirror of the contract (same snake_case names)
-  src/app/api/       SEAM: engine mock + iTunes audio proxy
-backend/       FastAPI service: mock engine + mock agent (swap points in app.py)
-engine/        (Axel) real trajectory engine — to build
+shared/     Engine ⇄ agent contract — the cross-team source of truth
+  schema.py        Pydantic models (MacroNode, Distribution, Trajectory…)
+web/        Next.js frontend + 3D compass + API proxy — Alberto
+  src/components/   SplitView, CompassScene (react-three-fiber), …
+  src/app/api/      proxy to the backend; mock fallback so the demo never dies
+  src/lib/types.ts  TS mirror of the contract (same snake_case names)
+backend/    FastAPI service — exposes the engine + agent over HTTP — Axel
+  app.py           routes: /entry /journey /refill /turn /recommend /health
+  agent.py         language layer (datapizza-ai + Claude): interpret + narrate
+  engine_bridge.py wires the real engine in (replaces the old mock_engine)
+engine/     The trajectory engine — Axel
+  taxonomy.py      12 macro-nodes + cached name embeddings (all-mpnet-base-v2)
+  softmap.py       Musixmatch mood/theme → distribution over the 12 nodes
+  trajectory.py    walks the emotional space, picks the nearest track per step
+  data/            cached node embeddings + seed catalog
 ```
 
-Folder boundaries = no git conflicts between the two.
+<!-- Axel: please sanity-check the backend/ + engine/ descriptions above for accuracy. -->
 
-## Run the frontend
+## Tech stack
+
+- **Musixmatch Pro API** — lyrics, richsync (the cited verse), `analysis.search` over the catalog.
+- **Engine** (Python) — `sentence-transformers/all-mpnet-base-v2` embeddings map tracks onto a 12-node emotion taxonomy (a valence × energy circumplex); trajectories are walks across that space.
+- **Agent** — Claude (`claude-sonnet-4-6`, via datapizza-ai): reads free-text mood into ≤3 weighted nodes + journey shape, and narrates each step.
+- **Frontend** — Next.js + `react-three-fiber` (3D compass); mobile compass-first + desktop split view. 30s previews via Deezer/iTunes (Musixmatch is lyrics, not audio).
+
+## Run locally
+
+### Frontend
 
 ```bash
 cd web
 npm install
-npm run dev      # http://localhost:3000
+npm run dev          # http://localhost:3000
 ```
 
-Runs **on its own, without an API key**: audio is real (public iTunes previews),
-the trajectory is mock (fallback when the backend is down).
+Runs on its own with **no key**: audio is real (iTunes/Deezer previews), the trajectory falls back to mock when the backend is down — the demo never dies.
 
-## Run the backend
+### Backend (real engine + agent)
 
-Python env is managed with **uv** (fixed/reproducible). Python is pinned to 3.12
-because datapizza-ai needs `>=3.10,<3.13`.
+Python env via **uv** (Python pinned to 3.12; datapizza-ai needs `>=3.10,<3.13`).
 
 ```bash
 cd backend
-uv sync                                  # downloads Python 3.12 + installs locked deps
-uv run uvicorn app:app --reload --port 8010
+uv sync                                       # Python 3.12 + locked deps (incl. torch)
+uv run uvicorn app:app --reload --port 8010   # first run downloads the model (~once)
 ```
 
-Then set `BACKEND_URL=http://localhost:8010` in `web/.env.local`. Engine and agent
-are MOCK (`mock_engine.py`, `agent.py`); swap points are in `app.py`.
+Keys live in `engine/.env` (git-ignored) — the engine loads them itself:
 
-No uv? Fallback with plain pip (needs Python 3.12 installed):
-```bash
-py -3.12 -m venv .venv && .venv\Scripts\activate   # Windows
-pip install -r requirements.txt
+```
+MUSIXMATCH_API_KEY=…
+ANTHROPIC_API_KEY=…
 ```
 
-## The seam (mock -> real engine)
+Then point the frontend at it: `BACKEND_URL=http://localhost:8010` in `web/.env.local`.
 
-Today `web/src/app/api/trajectory/route.ts` proxies the backend and falls back to
-mock data (`web/src/lib/mockData.ts`) that respects the `/shared` contract. When
-the real engine is ready, the backend swaps its import — **same JSON shape, the
-frontend doesn't change**.
+## Deploy — where it runs
 
-## Contest rule (important)
+Frontend and backend deploy **separately**, each where it fits best:
 
-No Musixmatch content may be persisted: lyrics/richsync/analysis are fetched
-**real-time per session** and wiped at session end. Only our own artifacts are
-persistable (macro-node name embeddings). Audio is NOT Musixmatch content
-(iTunes), so it's outside the constraint.
+- **Frontend → Vercel** (native Next.js). Set env `BACKEND_URL` to the backend's public URL, then deploy.
+- **Backend → Replit Reserved VM** (always-on). It loads an ML model (~542 MB) and needs a warm process, so use a **Reserved VM with ≥2 GB RAM — not Autoscale** (scale-to-zero would re-download/re-load the model on every cold start). Config: [`.replit`](./.replit).
+  - Secrets (Replit → Secrets): `MUSIXMATCH_API_KEY`, `ANTHROPIC_API_KEY`.
+  - Run: `cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT`.
+
+Both Vercel and Replit are Musicathon partners.
+
+## Musixmatch compliance
+
+No Musixmatch content is persisted: lyrics / richsync / analysis are fetched **real-time per session** and not stored. Only our own artifacts (the macro-node name embeddings) are cached. Audio is **not** Musixmatch content (iTunes/Deezer), so it sits outside the constraint.
