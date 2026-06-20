@@ -115,8 +115,6 @@ export default function SplitView() {
   // emotions → wheel (FIFO buffer of the last 3 presses). The shape derives from this.
   const [picks, setPicks] = useState<MacroNode[]>([]);
   const picksRef = useRef<MacroNode[]>([]);
-  // a longer memory of recently-touched emotions (last 6) → the compass constellation trail
-  const [pickHistory, setPickHistory] = useState<MacroNode[]>([]);
   const distribution = useMemo(() => freqDistribution(picks), [picks]);
   const comprehension = Math.min(1, picks.length / MAX_PICKS); // 0 → 3 picks (drives the pips + read bar)
 
@@ -410,7 +408,6 @@ export default function SplitView() {
     const next = [...picksRef.current, m];
     if (next.length > MAX_PICKS) next.shift();
     picksRef.current = next; setPicks(next);
-    setPickHistory((h) => [...h, m].slice(-6));
     onPicksChanged(next);
   }, [onPicksChanged]);
 
@@ -482,7 +479,7 @@ export default function SplitView() {
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     picksRef.current = []; modeRef.current = "deepen";
     setMessages([]);
-    setPicks([]); setPickHistory([]); setMode("deepen"); setPending(false); setShowSkipHint(false);
+    setPicks([]); setMode("deepen"); setPending(false); setShowSkipHint(false);
     setQueue([]); setIndex(0); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
@@ -650,7 +647,7 @@ export default function SplitView() {
           onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         >
           {!viewResolved ? null : useCompass && isMobile ? (
-            <CompassScene portrait dominant={lastPick} moodColor={compassColor} comprehension={comprehension} trail={pickHistory.length ? pickHistory : picks} onSelect={pickEmotion} />
+            <CompassScene portrait dominant={lastPick} moodColor={compassColor} comprehension={comprehension} trail={picks} onSelect={pickEmotion} />
           ) : (
             <div className="absolute left-1/2 top-1/2 aspect-square w-[118vw] max-w-[440px] -translate-x-1/2 -translate-y-1/2">
               <div className="lyra-breathe h-full w-full">
@@ -703,7 +700,7 @@ export default function SplitView() {
             <div className="flex shrink-0 justify-center px-6 pt-1"><div className="w-full max-w-[440px]"><LyricBanner verse={current?.verse ?? null} /></div></div>
             <div className="flex min-h-0 flex-1 items-center justify-center">
               {!viewResolved ? null : useCompass && !isMobile ? (
-                <div className="h-full w-full"><CompassScene dominant={lastPick} moodColor={compassColor} comprehension={comprehension} trail={pickHistory.length ? pickHistory : picks} onSelect={pickEmotion} /></div>
+                <div className="h-full w-full"><CompassScene dominant={lastPick} moodColor={compassColor} comprehension={comprehension} trail={picks} onSelect={pickEmotion} /></div>
               ) : (
                 <div className="relative aspect-square h-full max-h-[900px]">
                   <EmotionWheel distribution={distribution?.weights} comprehension={comprehension} currentEmotion={currentEmotion} shape big onSelect={pickEmotion} />
