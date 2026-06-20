@@ -114,9 +114,10 @@ const planeDist = (a: MacroNode, b: MacroNode) =>
 const nearestBy = (n: MacroNode, pool: MacroNode[]): MacroNode =>
   pool.length ? pool.reduce((best, m) => (planeDist(n, m) < planeDist(n, best) ? m : best), pool[0]) : n;
 
-// evolution: replace each emotion with the nearest one in a DIFFERENT region (a new feeling,
-// adjacent or a bit farther — but elsewhere on the wheel).
-const evolveNode = (n: MacroNode) => nearestBy(n, ALL_NODES.filter((m) => regionOf(m.name) !== regionOf(n)).map((m) => m.name));
+// evolution: advance each emotion to the NEXT region in a circular walk around the wheel
+// (R1→R2→R3→R4→R1, the angular order), nearest node in that region. Repeated evolution thus
+// keeps exploring — it tours the whole wheel instead of ping-ponging between two nodes.
+const evolveNode = (n: MacroNode) => nearestBy(n, REGIONS[(regionOf(n) + 1) % REGIONS.length]);
 // escalation: replace each with the nearest emotion at HIGHER arousal (energy = the y axis);
 // if already at the top, keep it.
 const escalateNode = (n: MacroNode) => nearestBy(n, ALL_NODES.filter((m) => m.y > TAXONOMY[n].y + 0.02).map((m) => m.name));

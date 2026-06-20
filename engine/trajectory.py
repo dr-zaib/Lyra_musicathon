@@ -179,8 +179,15 @@ def _fetch_candidates(target: np.ndarray, lang: str = "en") -> list[dict]:
         "moods": _target_moods(target),
         "lyrics_language": lang,
     }
+    # vary the page so the same mood query doesn't always return the identical top slice —
+    # more catalog variety across turns. Falls back to page 1 if a deeper page is empty
+    # (niche moods), so a step is never dropped.
+    page = random.randint(1, 3)
     try:
-        return mxm.search_analysis(data, page_size=CANDIDATES_PER_STEP)
+        items = mxm.search_analysis(data, page=page, page_size=CANDIDATES_PER_STEP)
+        if not items and page != 1:
+            items = mxm.search_analysis(data, page=1, page_size=CANDIDATES_PER_STEP)
+        return items
     except mxm.MusixmatchError as exc:
         log.warning("analysis.search failed for moods %s: %s", data["moods"], exc)
         return []
@@ -237,18 +244,28 @@ def _verse_timestamp(commontrack_id, verse: str | None) -> float | None:
     return None
 
 
+SELECT_TOP_K = 5  # sample among the K nearest candidates (variety, not always the argmin)
+
+
+def _track_key(track: dict) -> str:
+    """artist|title key — dedupes the SAME song that exists under several commontrack_ids
+    (single / album / remaster) so it can't appear twice in one journey."""
+    return f"{(track.get('artist_name') or '').lower().strip()}|{(track.get('track_name') or '').lower().strip()}"
+
+
 def find_next_track(target: np.ndarray, candidates: list[dict], used: set,
                     require_richsync: bool = False, min_rating: int = 0,
                     banned_artists: set = frozenset(), banned_isrcs: set = frozenset()):
-    """Pick the candidate whose soft-mapped distribution is nearest the target
-    (Euclidean), skipping used / banned tracks and those below the popularity floor.
-    Returns (item, distribution_vec) or (None, None)."""
-    best, best_vec, best_d = None, None, 1e9
+    """Pick a candidate whose soft-mapped distribution is NEAR the target — sampled (not
+    strictly argmin) among the K nearest, weighted toward the closest, so repeated turns on
+    a similar target don't always surface the very same track. Skips used / banned tracks
+    and those below the popularity floor. Returns (item, distribution_vec) or (None, None)."""
+    scored = []
     for item in candidates:
         track = item.get("track") or {}
         ctid = track.get("commontrack_id")
         analysis = item.get("analysis")
-        if not ctid or ctid in used or not isinstance(analysis, dict):
+        if not ctid or ctid in used or _track_key(track) in used or not isinstance(analysis, dict):
             continue
         if require_richsync and not track.get("has_richsync"):
             continue
@@ -262,9 +279,14 @@ def find_next_track(target: np.ndarray, candidates: list[dict], used: set,
         dist = softmap.analysis_to_distribution(analysis)
         vec = np.array([dist[n] for n in NODE_NAMES])
         d = float(np.linalg.norm(vec - target))
-        if d < best_d:
-            best, best_vec, best_d = item, vec, d
-    return best, best_vec
+        scored.append((d, item, vec))
+    if not scored:
+        return None, None
+    scored.sort(key=lambda x: x[0])
+    top = scored[:SELECT_TOP_K]
+    weights = [1.0 / (i + 1) for i in range(len(top))]  # rank 1 most likely, still coherent
+    _, item, vec = random.choices(top, weights=weights, k=1)[0]
+    return item, vec
 
 
 # ---- orchestrator -----------------------------------------------------------
@@ -453,6 +475,7 @@ def _targeted_picks(seed_mood, shape, n, end_node, used, banned_artists, banned_
             log.warning("no candidate for target %s", _target_moods(target))
             continue
         used.add(item["track"].get("commontrack_id"))
+        used.add(_track_key(item["track"]))  # also block the same song under another id
         picks.append((target, item, vec, _citable_verse(item.get("analysis"), target)))
     return picks
 
