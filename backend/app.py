@@ -51,6 +51,8 @@ app.add_middleware(
 )
 
 N_STEPS = 4  # trajectory length for the demo (each step = 1 analysis.search call)
+JOURNEY_STEPS = 6  # /journey: a few more steps so an evolve/escalate transition reads gradual
+                   # (the analysis.search calls run in parallel, so latency stays ~flat)
 
 
 class RecommendRequest(AgentTurnRequest):
@@ -152,10 +154,11 @@ def journey(req: JourneyRequest) -> Trajectory:
     """Build the playlist for the chosen shape, excluding what already played
     (entry track + skips). Queue it behind the entry track on the player."""
     seed_dist = req.seed_distribution.weights if req.seed_distribution else None
+    end_dist = req.end_distribution.weights if req.end_distribution else None
     traj = Trajectory(**build_trajectory(
-        req.seed_mood, req.shape, n_steps=N_STEPS,
+        req.seed_mood, req.shape, n_steps=JOURNEY_STEPS,
         end_node=req.end_mood, exclude_isrcs=req.exclude_isrcs,
-        seed_distribution=seed_dist))
+        seed_distribution=seed_dist, end_distribution=end_dist))
     return agent.narrate(traj)
 
 

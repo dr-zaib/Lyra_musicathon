@@ -22,7 +22,7 @@ import PlayerBar from "./PlayerBar";
 import PlaylistView from "./PlaylistView";
 import Settings, { type PlaybackSettings, defaultLanguage } from "./Settings";
 import { hasWebGL } from "@/lib/webgl";
-import { TAXONOMY } from "@/lib/taxonomy";
+import { TAXONOMY, ALL_NODES } from "@/lib/taxonomy";
 import type {
   AgentTurn,
   EntryResponse,
@@ -100,22 +100,33 @@ function distributionToPicks(d: NodeDistribution): MacroNode[] {
   return picks.slice(0, MAX_PICKS);
 }
 
-// Where a generation mode points the journey — a LOCAL mirror of the engine's trajectory
-// operators (engine/trajectory.py), so the compass can swing to a mode's destination the
-// instant you click it: deterministic, synchronous, no waiting on /journey (which was what
-// made the dial rotate erratically). Keep in sync with RING/HIGH_AROUSAL there.
-const RING: MacroNode[] = [
-  "Tenderness", "Hope", "Joy", "Empowerment", "Awe", "Defiance",
-  "Anger", "Anxiety", "Melancholia", "Solitude", "Reflection", "Nostalgia",
+// The 4 emotional REGIONS (3 each, balanced) — arcs of the circumplex by angle, not rigid
+// x/y quadrants, so each holds exactly 3. Drive the generation-mode paradigms below.
+const REGIONS: MacroNode[][] = [
+  ["Melancholia", "Solitude", "Reflection"],   // withdrawn / low energy, negative
+  ["Nostalgia", "Tenderness", "Hope"],         // warm / tender, positive low-mid
+  ["Joy", "Awe", "Empowerment"],               // uplifted, high energy positive
+  ["Defiance", "Anger", "Anxiety"],            // intense / agitated, high energy negative
 ];
-const HIGH_AROUSAL: MacroNode[] = ["Anger", "Empowerment", "Defiance", "Joy", "Anxiety"];
-function modeDestination(seed: MacroNode | null, shape: TrajectoryShape): MacroNode | null {
-  if (!seed) return null;
-  const i = RING.indexOf(seed);
-  if (shape === "deepen") return seed;                         // converge on the strongest emotion
-  if (shape === "evolve") return RING[(i + 5) % RING.length];  // shift to a different region
-  const cands = HIGH_AROUSAL.filter((n) => n !== seed);        // escalate: nearest high-arousal ≠ seed
-  return cands.reduce((b, n) => (Math.abs(RING.indexOf(n) - i) < Math.abs(RING.indexOf(b) - i) ? n : b), cands[0]);
+const regionOf = (n: MacroNode) => REGIONS.findIndex((r) => r.includes(n));
+const planeDist = (a: MacroNode, b: MacroNode) =>
+  Math.hypot(TAXONOMY[a].x - TAXONOMY[b].x, TAXONOMY[a].y - TAXONOMY[b].y);
+const nearestBy = (n: MacroNode, pool: MacroNode[]): MacroNode =>
+  pool.length ? pool.reduce((best, m) => (planeDist(n, m) < planeDist(n, best) ? m : best), pool[0]) : n;
+
+// evolution: replace each emotion with the nearest one in a DIFFERENT region (a new feeling,
+// adjacent or a bit farther — but elsewhere on the wheel).
+const evolveNode = (n: MacroNode) => nearestBy(n, ALL_NODES.filter((m) => regionOf(m.name) !== regionOf(n)).map((m) => m.name));
+// escalation: replace each with the nearest emotion at HIGHER arousal (energy = the y axis);
+// if already at the top, keep it.
+const escalateNode = (n: MacroNode) => nearestBy(n, ALL_NODES.filter((m) => m.y > TAXONOMY[n].y + 0.02).map((m) => m.name));
+
+// The DESTINATION constellation a mode re-selects the picks into. deepen stays put (start =
+// end = same constellation → similar tracks); evolve/escalate move each emotion per the rule.
+function destinationPicks(shape: TrajectoryShape, picks: MacroNode[]): MacroNode[] {
+  if (shape === "evolve") return picks.map(evolveNode);
+  if (shape === "escalate") return picks.map(escalateNode);
+  return picks; // deepen
 }
 
 export default function SplitView() {
@@ -155,10 +166,6 @@ export default function SplitView() {
   const playedIsrcs = useRef<string[]>([]);
   const autoGenFired = useRef(false);
   const shownReason = useRef<string | null>(null);
-  // when a MODE is chosen, the compass swings to that mode's destination (computed locally,
-  // instantly). null = no mode chosen yet → the dial shows the last picked emotion. Cleared
-  // on any emotion pick so a click rotates the dial back to the clicked emotion.
-  const [headingNode, setHeadingNode] = useState<MacroNode | null>(null);
 
   // audio
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -209,12 +216,11 @@ export default function SplitView() {
   // current track's mood, then a soft violet.
   const moodMacro = useMemo<MacroNode | null>(() => dominantOf(distribution) ?? currentEmotion, [distribution, currentEmotion]);
   const moodColor = moodMacro ? TAXONOMY[moodMacro].color : "#5a4d8a";
-  // the compass needle points to the last emotion you touched — so picking 3 emotions leaves
-  // it on the 3rd, and a click rotates it there at once. When you choose a generation mode it
-  // swings to that mode's destination (deepen→strongest, evolve→a new region, escalate→high
-  // energy), computed locally so it's instant and never erratic.
+  // the compass needle points to the last emotion in the current constellation. Picking 3
+  // emotions leaves it on the 3rd; choosing a mode re-selects the constellation (evolve/
+  // escalate) so the dial naturally lands on the new destination, deep dive leaves it put.
   const lastPick = picks.length ? picks[picks.length - 1] : null;
-  const compassHeading = (playing && headingNode) ? headingNode : lastPick;
+  const compassHeading = lastPick;
   const compassColor = compassHeading ? TAXONOMY[compassHeading].color : moodColor;
   // the 3D compass is the default; fall back to the 2.5D wheel when it's off (?view=2d) or
   // the device has no WebGL. The mobile/desktop blocks each gate their own canvas on isMobile
@@ -325,7 +331,7 @@ export default function SplitView() {
   // first commit → entry track plays immediately (the journey hides behind it)
   const startPlayback = useCallback(async (forPicks: MacroNode[], message?: string) => {
     setPending(true); autoGenFired.current = false; shownReason.current = null;
-    modeRef.current = "deepen"; setMode("deepen"); setHeadingNode(null);
+    modeRef.current = "deepen"; setMode("deepen");
     const seedDist = freqDistribution(forPicks);
     const seedMood = dominantOf(seedDist);
     let data: EntryResponse;
@@ -390,13 +396,15 @@ export default function SplitView() {
 
   // rebuild the UPCOMING queue (new mood/mode) WITHOUT touching the current track.
   // It plays out (or the user skips); the new-mood tracks queue behind it. Progressive.
-  const rebuildTail = useCallback(async (forPicks: MacroNode[], shape: TrajectoryShape) => {
+  // The journey travels from `forPicks` (where you are) to `endPicks` (the destination
+  // constellation: same for deep dive, a re-selected one for evolve/escalate).
+  const rebuildTail = useCallback(async (forPicks: MacroNode[], shape: TrajectoryShape, endPicks: MacroNode[]) => {
     const seedDist = freqDistribution(forPicks);
     const seedMood = dominantOf(seedDist);
     if (!seedMood) return;
     let traj: Trajectory;
     try {
-      const body: JourneyRequest = { seed_mood: seedMood, seed_distribution: seedDist, shape, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current };
+      const body: JourneyRequest = { seed_mood: seedMood, seed_distribution: seedDist, end_distribution: freqDistribution(endPicks), shape, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current };
       const res = await fetch("/api/journey", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -421,11 +429,13 @@ export default function SplitView() {
     }
   }, [settings.knownNew, settings.language]);
 
-  // a change to the emotion buffer: start (first time we hit 3) or rebuild the tail
+  // a change to the emotion buffer: start (first time we hit 3) or rebuild the tail.
+  // Choosing emotions resets the mode to deep dive on those emotions (start = end = picks).
   const onPicksChanged = useCallback((next: MacroNode[]) => {
     if (next.length < MAX_PICKS) return; // not ready yet — just shaping the wheel
+    modeRef.current = "deepen"; setMode("deepen");
     if (!playingRef.current) startPlayback(next);
-    else rebuildTail(next, modeRef.current);
+    else rebuildTail(next, "deepen", next);
   }, [startPlayback, rebuildTail]);
 
   // click an emotion node → push to the FIFO buffer (max 3; same mood twice = 2×)
@@ -433,7 +443,6 @@ export default function SplitView() {
     const next = [...picksRef.current, m];
     if (next.length > MAX_PICKS) next.shift();
     picksRef.current = next; setPicks(next);
-    setHeadingNode(null); // a click → the dial follows the clicked emotion, not a mode heading
     onPicksChanged(next);
   }, [onPicksChanged]);
 
@@ -460,21 +469,24 @@ export default function SplitView() {
     setPending(false);
     if (!next.length) return; // couldn't read a mood — leave it to the user to add more
     picksRef.current = next; setPicks(next);
-    setHeadingNode(null); // typed emotions behave like picks → dial follows them
-    if (!playingRef.current) startPlayback(next, text); else rebuildTail(next, modeRef.current);
+    modeRef.current = "deepen"; setMode("deepen"); // typed emotions → deep dive on them
+    if (!playingRef.current) startPlayback(next, text); else rebuildTail(next, "deepen", next);
   }, [settings.language, startPlayback, rebuildTail]);
 
   // surprise me → start from pure serendipity (no picks)
   const surprise = useCallback(() => { startPlayback([]); }, [startPlayback]);
 
-  // steer: pick a mode → light it, swing the compass to that mode's destination (local,
-  // instant), and rebuild the tail with it.
+  // steer: pick a mode → light it, RE-SELECT the emotions per the mode's paradigm (the
+  // constellation morphs), and rebuild the tail as a journey from the current constellation
+  // to the new one. deep dive leaves the constellation put (start = end → similar tracks).
   const chooseMode = useCallback((shape: TrajectoryShape) => {
     modeRef.current = shape; setMode(shape);
-    if (playingRef.current) {
-      setHeadingNode(modeDestination(dominantOf(freqDistribution(picksRef.current)), shape));
-      rebuildTail(picksRef.current, shape);
-    }
+    if (!playingRef.current) return;
+    autoGenFired.current = true; // an explicit choice → auto-gen must not override it
+    const from = picksRef.current;
+    const dest = destinationPicks(shape, from);
+    rebuildTail(from, shape, dest);
+    if (shape !== "deepen") { picksRef.current = dest; setPicks(dest); } // re-select the constellation to the destination
   }, [rebuildTail]);
 
   const next = useCallback(() => {
@@ -499,7 +511,7 @@ export default function SplitView() {
     // hide the gen time: near the entry track's end, auto-build the journey (silent)
     if (!autoGenFired.current && playingRef.current && duration > 0 && duration - t <= 8) {
       autoGenFired.current = true;
-      rebuildTail(picksRef.current, modeRef.current);
+      rebuildTail(picksRef.current, "deepen", picksRef.current); // default journey: deep dive on the mood
     }
   };
 
@@ -510,7 +522,7 @@ export default function SplitView() {
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     picksRef.current = []; modeRef.current = "deepen";
     setMessages([]);
-    setPicks([]); setMode("deepen"); setHeadingNode(null); setPending(false); setShowSkipHint(false);
+    setPicks([]); setMode("deepen"); setPending(false); setShowSkipHint(false);
     setQueue([]); setIndex(0); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);

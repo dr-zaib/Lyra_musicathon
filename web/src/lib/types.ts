@@ -111,7 +111,8 @@ export interface EntryResponse {
 
 export interface JourneyRequest {
   seed_mood: MacroNode;
-  seed_distribution?: NodeDistribution | null; // full ≤3-node weighted read → journey start
+  seed_distribution?: NodeDistribution | null;  // full weighted read → journey START
+  end_distribution?: NodeDistribution | null;   // destination constellation → journey END (the engine interpolates start→end)
   shape: TrajectoryShape;
   end_mood?: MacroNode | null;
   exclude_isrcs?: string[]; // already played (entry track + skips)

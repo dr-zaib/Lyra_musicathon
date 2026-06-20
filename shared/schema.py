@@ -137,7 +137,8 @@ class JourneyRequest(BaseModel):
     """Build the playlist for a chosen shape, from the entry mood/track outward."""
 
     seed_mood: MacroNode                                    # dominant (back-compat)
-    seed_distribution: NodeDistribution | None = None       # full ≤3-node weighted read → journey start
+    seed_distribution: NodeDistribution | None = None       # full ≤3-node weighted read → journey START
+    end_distribution: NodeDistribution | None = None        # destination constellation → journey END (engine interpolates start→end)
     shape: TrajectoryShape
     end_mood: MacroNode | None = None
     exclude_isrcs: list[str] = Field(default_factory=list)   # already played (entry/skips)
