@@ -52,8 +52,9 @@ packages is locked in `uv.lock`; `requirements.txt` is an exported pinned fallba
 
 ## Docs
 - `docs/HOW_IT_WORKS.md` — end-to-end walkthrough (engine + agent, the live turn, the richsync/listening model).
-- `docs/FRONTEND_HANDOFF.md` — **Alberto's task list** to wire the frontend to the real backend without breakage (P0 timeout+`BACKEND_URL`, P1 shuffle/single-shot alignment, P2 verse+voice, P3 redirect).
+- `docs/PITCH.md` — the pitch / submission copy (problem · idea · why Musixmatch · architecture).
 - `engine/README.md` — engine modules, setup, backend wire.
+- `archive/` — pre-deploy holding pen for files no longer used (mock_engine, the old build-plan, the completed FRONTEND_HANDOFF, etc.). The project does not depend on any of them; delete the folder after a successful deploy.
 
 ## The contract
 `shared/schema.py` (Pydantic, Axel side) ↔ `web/src/lib/types.ts` (Alberto side),

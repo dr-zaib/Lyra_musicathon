@@ -53,4 +53,4 @@ the agent layer.
   replaces the `text_to_intent` stub and the empty `message`/`shuffle`.
 - Fine-tune match precision at the extremes of `deepen` (catalog has few *popular*
   single-emotion songs); pick an even better citable line.
-- `analysis.search` body schema is documented in `musixmatch_llms_full.txt`.
+- `analysis.search` body schema is documented in `archive/musixmatch_llms_full.txt` (a copy of the public Musixmatch API docs; archived pre-deploy).
