@@ -118,10 +118,17 @@ class _Reasons(BaseModel):
     reasons: list[str]  # exactly one per step, in order
 
 
+# The UI does not display transition_reason — Lyra is a recsys, not a critic, so it
+# shows no interpretive blurbs (only the cited verse, which is the raw lyric). Generating
+# narration is therefore a wasted LLM call on every journey/recalc → narration is OFF.
+# Flip to True to re-enable the agent's voice (e.g. for ElevenLabs voice-out).
+NARRATE_ENABLED = False
+
+
 def narrate(trajectory: Trajectory) -> Trajectory:
     """Fill each step's transition_reason (the agent's voice), citing the verse.
-    One LLM call for the whole journey."""
-    if not trajectory.steps:
+    One LLM call for the whole journey. Disabled by default (see NARRATE_ENABLED)."""
+    if not NARRATE_ENABLED or not trajectory.steps:
         return trajectory
     try:
         lines = []

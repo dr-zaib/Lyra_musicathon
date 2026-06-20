@@ -143,8 +143,11 @@ def operator_targets(shape: str, seed: str, n_steps: int,
         end = _onehot(end_node or _default_destination(seed))
         return start, _interp(start, end, n_steps)
     if shape == "escalate":
-        # move toward the nearest high-arousal node (experimental)
-        target = end_node or min(HIGH_AROUSAL, key=lambda n: abs(RING.index(n) - RING.index(seed)))
+        # raise the energy: move toward the nearest high-arousal node OTHER than the
+        # seed itself — otherwise escalate collapses onto deepen when the seed is
+        # already high-arousal (e.g. Anger), making the two shapes identical.
+        cands = [n for n in HIGH_AROUSAL if n != seed] or HIGH_AROUSAL
+        target = end_node or min(cands, key=lambda n: abs(RING.index(n) - RING.index(seed)))
         return start, _interp(start, _onehot(target), n_steps)
     raise ValueError(f"unknown shape: {shape}")
 

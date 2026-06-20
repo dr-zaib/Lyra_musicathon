@@ -146,6 +146,7 @@ export default function SplitView() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioPrimed = useRef(false);
+  const loadedUrl = useRef<string | null>(null); // the preview currently loaded into <audio>
 
   // Unlock audio on the first user gesture (see SILENT_WAV): play a silent clip while
   // we still have the gesture's activation, so the entry track — whose play() lands a
@@ -276,23 +277,25 @@ export default function SplitView() {
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // play the current track + narrate it into the feed
-  /* eslint-disable react-hooks/set-state-in-effect -- syncing the <audio> element + narration */
+  // load + play ONLY the current track. A tail rebuild (mode/pick change, refill,
+  // auto-gen) replaces the queue array but keeps the current item — so we reload the
+  // <audio> only when the current track's preview actually changes, never on a mere
+  // queue-array change. This is what keeps the player from restarting/interrupting
+  // when you switch mode or add a 4th emotion (only the upcoming queue should change).
+  /* eslint-disable react-hooks/set-state-in-effect -- syncing the <audio> element */
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !current) return;
-    const url = current.track.preview_url;
+    const url = current.track.preview_url ?? null;
+    if (url === loadedUrl.current) return; // same track still playing → don't touch it
+    loadedUrl.current = url;
     if (url) {
       a.src = url; a.load();
       a.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
-      setIsPlaying(false);
+      a.removeAttribute("src"); setIsPlaying(false);
     }
     if (current.track.isrc && !playedIsrcs.current.includes(current.track.isrc)) playedIsrcs.current.push(current.track.isrc);
-    if (current.reason && shownReason.current !== current.reason) {
-      shownReason.current = current.reason;
-      setMessages((m) => [...m, { role: "agent", text: current.reason! }]);
-    }
   }, [index, queue]); // eslint-disable-line react-hooks/exhaustive-deps
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -474,6 +477,7 @@ export default function SplitView() {
 
   const reset = useCallback(() => {
     const a = audioRef.current; if (a) { a.pause(); a.removeAttribute("src"); }
+    loadedUrl.current = null;
     sessionId.current = crypto.randomUUID();
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     picksRef.current = []; modeRef.current = "deepen";
