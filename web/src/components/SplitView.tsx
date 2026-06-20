@@ -100,6 +100,24 @@ function distributionToPicks(d: NodeDistribution): MacroNode[] {
   return picks.slice(0, MAX_PICKS);
 }
 
+// Where a generation mode points the journey — a LOCAL mirror of the engine's trajectory
+// operators (engine/trajectory.py), so the compass can swing to a mode's destination the
+// instant you click it: deterministic, synchronous, no waiting on /journey (which was what
+// made the dial rotate erratically). Keep in sync with RING/HIGH_AROUSAL there.
+const RING: MacroNode[] = [
+  "Tenderness", "Hope", "Joy", "Empowerment", "Awe", "Defiance",
+  "Anger", "Anxiety", "Melancholia", "Solitude", "Reflection", "Nostalgia",
+];
+const HIGH_AROUSAL: MacroNode[] = ["Anger", "Empowerment", "Defiance", "Joy", "Anxiety"];
+function modeDestination(seed: MacroNode | null, shape: TrajectoryShape): MacroNode | null {
+  if (!seed) return null;
+  const i = RING.indexOf(seed);
+  if (shape === "deepen") return seed;                         // converge on the strongest emotion
+  if (shape === "evolve") return RING[(i + 5) % RING.length];  // shift to a different region
+  const cands = HIGH_AROUSAL.filter((n) => n !== seed);        // escalate: nearest high-arousal ≠ seed
+  return cands.reduce((b, n) => (Math.abs(RING.indexOf(n) - i) < Math.abs(RING.indexOf(b) - i) ? n : b), cands[0]);
+}
+
 export default function SplitView() {
   const sessionId = useRef<string>(crypto.randomUUID());
   const [settings, setSettings] = useState<PlaybackSettings>(() => ({ knownNew: 0.5, skipMode: "scroll", language: defaultLanguage() }));
@@ -137,6 +155,10 @@ export default function SplitView() {
   const playedIsrcs = useRef<string[]>([]);
   const autoGenFired = useRef(false);
   const shownReason = useRef<string | null>(null);
+  // when a MODE is chosen, the compass swings to that mode's destination (computed locally,
+  // instantly). null = no mode chosen yet → the dial shows the last picked emotion. Cleared
+  // on any emotion pick so a click rotates the dial back to the clicked emotion.
+  const [headingNode, setHeadingNode] = useState<MacroNode | null>(null);
 
   // audio
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -187,12 +209,12 @@ export default function SplitView() {
   // current track's mood, then a soft violet.
   const moodMacro = useMemo<MacroNode | null>(() => dominantOf(distribution) ?? currentEmotion, [distribution, currentEmotion]);
   const moodColor = moodMacro ? TAXONOMY[moodMacro].color : "#5a4d8a";
-  // the compass needle: while a journey plays it follows the CURRENT track's emotion (so the
-  // dial moves through the journey — deepen barely turns, evolve sweeps, escalate climbs to
-  // high energy); while shaping (not playing) it points to the last emotion touched, so a
-  // click rotates the dial to it at once. No async "heading" → the rotation is never erratic.
+  // the compass needle points to the last emotion you touched — so picking 3 emotions leaves
+  // it on the 3rd, and a click rotates it there at once. When you choose a generation mode it
+  // swings to that mode's destination (deepen→strongest, evolve→a new region, escalate→high
+  // energy), computed locally so it's instant and never erratic.
   const lastPick = picks.length ? picks[picks.length - 1] : null;
-  const compassHeading = playing ? (currentEmotion ?? lastPick) : lastPick;
+  const compassHeading = (playing && headingNode) ? headingNode : lastPick;
   const compassColor = compassHeading ? TAXONOMY[compassHeading].color : moodColor;
   // the 3D compass is the default; fall back to the 2.5D wheel when it's off (?view=2d) or
   // the device has no WebGL. The mobile/desktop blocks each gate their own canvas on isMobile
@@ -303,7 +325,7 @@ export default function SplitView() {
   // first commit → entry track plays immediately (the journey hides behind it)
   const startPlayback = useCallback(async (forPicks: MacroNode[], message?: string) => {
     setPending(true); autoGenFired.current = false; shownReason.current = null;
-    modeRef.current = "deepen"; setMode("deepen");
+    modeRef.current = "deepen"; setMode("deepen"); setHeadingNode(null);
     const seedDist = freqDistribution(forPicks);
     const seedMood = dominantOf(seedDist);
     let data: EntryResponse;
@@ -411,6 +433,7 @@ export default function SplitView() {
     const next = [...picksRef.current, m];
     if (next.length > MAX_PICKS) next.shift();
     picksRef.current = next; setPicks(next);
+    setHeadingNode(null); // a click → the dial follows the clicked emotion, not a mode heading
     onPicksChanged(next);
   }, [onPicksChanged]);
 
@@ -437,16 +460,21 @@ export default function SplitView() {
     setPending(false);
     if (!next.length) return; // couldn't read a mood — leave it to the user to add more
     picksRef.current = next; setPicks(next);
+    setHeadingNode(null); // typed emotions behave like picks → dial follows them
     if (!playingRef.current) startPlayback(next, text); else rebuildTail(next, modeRef.current);
   }, [settings.language, startPlayback, rebuildTail]);
 
   // surprise me → start from pure serendipity (no picks)
   const surprise = useCallback(() => { startPlayback([]); }, [startPlayback]);
 
-  // steer: pick a mode → light it + rebuild the tail with it
+  // steer: pick a mode → light it, swing the compass to that mode's destination (local,
+  // instant), and rebuild the tail with it.
   const chooseMode = useCallback((shape: TrajectoryShape) => {
     modeRef.current = shape; setMode(shape);
-    if (playingRef.current) rebuildTail(picksRef.current, shape);
+    if (playingRef.current) {
+      setHeadingNode(modeDestination(dominantOf(freqDistribution(picksRef.current)), shape));
+      rebuildTail(picksRef.current, shape);
+    }
   }, [rebuildTail]);
 
   const next = useCallback(() => {
@@ -482,7 +510,7 @@ export default function SplitView() {
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     picksRef.current = []; modeRef.current = "deepen";
     setMessages([]);
-    setPicks([]); setMode("deepen"); setPending(false); setShowSkipHint(false);
+    setPicks([]); setMode("deepen"); setHeadingNode(null); setPending(false); setShowSkipHint(false);
     setQueue([]); setIndex(0); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
