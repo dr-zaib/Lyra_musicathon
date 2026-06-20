@@ -1,0 +1,18 @@
+# Lyra — Replit config for the BACKEND (FastAPI + engine).
+# The frontend (web/) deploys separately on Vercel — ignore it here.
+#
+# Deploy as a RESERVED VM (always-on) so the ML model (all-mpnet-base-v2, ~542MB)
+# downloads once and stays warm — Autoscale would re-download on every cold start.
+# Set these in Replit → Secrets (they become env vars; the code reads them via
+# os.environ, no .env needed):  MUSIXMATCH_API_KEY  ·  ANTHROPIC_API_KEY
+
+modules = ["python-3.12"]
+
+# Workspace run (dev preview inside Replit)
+run = "cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT"
+
+[deployment]
+deploymentTarget = "gce"        # "gce" = Reserved VM (always-on). If the Deploy panel
+                                # shows a different default, pick "Reserved VM" there.
+build = ["sh", "-c", "pip install -r backend/requirements.txt"]
+run = ["sh", "-c", "cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT"]
