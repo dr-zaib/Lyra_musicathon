@@ -138,8 +138,11 @@ export default function SplitView() {
   const autoGenFired = useRef(false);
   const shownReason = useRef<string | null>(null);
   // where the journey is HEADING (the trajectory's end target) — set on each (re)build.
-  // The compass needle points here while playing, so choosing a mode swings the map.
   const [heading, setHeading] = useState<MacroNode | null>(null);
+  // true only right after a MODE change: then the compass swings to the journey heading.
+  // After an emotion click it's false, so the dial rotates to the clicked emotion (the
+  // immediate click feedback that must keep working). See compassHeading below.
+  const [steering, setSteering] = useState(false);
 
   // audio
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -194,7 +197,9 @@ export default function SplitView() {
   // (the trajectory's end target) so choosing a mode swings the dial; while shaping (not
   // playing) it points to the last emotion you touched, so a click rotates the dial at once.
   const lastPick = picks.length ? picks[picks.length - 1] : null;
-  const compassHeading = (playing && heading) ? heading : lastPick;
+  // after a mode change → point at the journey heading; otherwise (incl. every emotion
+  // click) point at the last emotion touched, so a click rotates the dial to it at once.
+  const compassHeading = (playing && steering && heading) ? heading : lastPick;
   const compassColor = compassHeading ? TAXONOMY[compassHeading].color : moodColor;
   // the 3D compass is the default; fall back to the 2.5D wheel when it's off (?view=2d) or
   // the device has no WebGL. The mobile/desktop blocks each gate their own canvas on isMobile
@@ -305,7 +310,7 @@ export default function SplitView() {
   // first commit → entry track plays immediately (the journey hides behind it)
   const startPlayback = useCallback(async (forPicks: MacroNode[], message?: string) => {
     setPending(true); autoGenFired.current = false; shownReason.current = null;
-    modeRef.current = "deepen"; setMode("deepen"); setHeading(null);
+    modeRef.current = "deepen"; setMode("deepen"); setHeading(null); setSteering(false);
     const seedDist = freqDistribution(forPicks);
     const seedMood = dominantOf(seedDist);
     let data: EntryResponse;
@@ -416,6 +421,7 @@ export default function SplitView() {
     const next = [...picksRef.current, m];
     if (next.length > MAX_PICKS) next.shift();
     picksRef.current = next; setPicks(next);
+    setSteering(false); // a click → the dial follows the clicked emotion, not the heading
     onPicksChanged(next);
   }, [onPicksChanged]);
 
@@ -442,6 +448,7 @@ export default function SplitView() {
     setPending(false);
     if (!next.length) return; // couldn't read a mood — leave it to the user to add more
     picksRef.current = next; setPicks(next);
+    setSteering(false); // typed emotions behave like picks → dial follows them, not the heading
     if (!playingRef.current) startPlayback(next, text); else rebuildTail(next, modeRef.current);
   }, [settings.language, startPlayback, rebuildTail]);
 
@@ -451,7 +458,7 @@ export default function SplitView() {
   // steer: pick a mode → light it + rebuild the tail with it
   const chooseMode = useCallback((shape: TrajectoryShape) => {
     modeRef.current = shape; setMode(shape);
-    if (playingRef.current) rebuildTail(picksRef.current, shape);
+    if (playingRef.current) { setSteering(true); rebuildTail(picksRef.current, shape); } // → dial swings to the new heading
   }, [rebuildTail]);
 
   const next = useCallback(() => {
@@ -487,7 +494,7 @@ export default function SplitView() {
     playedIsrcs.current = []; autoGenFired.current = false; shownReason.current = null; skipHintDone.current = false;
     picksRef.current = []; modeRef.current = "deepen";
     setMessages([]);
-    setPicks([]); setMode("deepen"); setHeading(null); setPending(false); setShowSkipHint(false);
+    setPicks([]); setMode("deepen"); setHeading(null); setSteering(false); setPending(false); setShowSkipHint(false);
     setQueue([]); setIndex(0); setPlaylistOpen(false);
     setIsPlaying(false); setCurrentTime(0); setDuration(0); setDraft("");
   }, []);
