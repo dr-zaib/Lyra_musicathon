@@ -162,3 +162,11 @@ Young framework (v0.x) → keep it in a **low-risk role**:
   - Response (turn): `{ message, confidence: float, distribution: NodeDistribution, shuffle: float, trajectory: Trajectory | null }`.
 - **Trajectory shape stays first-class**: deepen/evolve/escalate may be agent-inferred, but the journey must be *legible* to the user (the agent names it in friendly verbs). Don't let the shapes go invisible in the conversational flow.
 - Animation reference: see the chat prototypes (v4 wheel morph + split). Real impl uses Motion; can be pushed further (orbit-out, particles) later.
+
+## TODO — README to update (June 2026)
+
+README was rewritten to best-practices; these slots are **placeholders** to fill before submission:
+- **Hero screenshot / demo GIF** — slot reserved in `README.md` (`<!-- screenshot placeholder -->`). Image to be chosen together (do NOT auto-embed cropped screenshots).
+- **Demo video link** — `_TBD_` in README (Live + Links sections).
+- **License** — `_TBD_`; add a `LICENSE` file before open-sourcing / when the repo goes public for the Musicathon.
+- Axel: sanity-check the `backend/` + `engine/` descriptions in the README Architecture section.

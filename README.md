@@ -4,7 +4,23 @@
 
 Most discovery matches the *surface* of music (genre, tempo, audio fingerprint). Lyra matches **meaning**: it reads lyrics, places every track in an emotional space, meets you where you are, and walks you somewhere — citing the **line** that marks each passage.
 
+<!-- TODO: hero screenshot / demo GIF goes here — image to be chosen with Alberto. -->
+<!-- screenshot placeholder -->
+
 > Submission copy (one-liner · description · tags): [`SUBMISSION.md`](./SUBMISSION.md)
+
+## Table of contents
+
+- [How it works](#how-it-works)
+- [Features](#features)
+- [Live](#live)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Run locally](#run-locally)
+- [Deploy](#deploy)
+- [Musixmatch compliance](#musixmatch-compliance)
+- [Links](#links)
+- [License](#license)
 
 ## How it works
 
@@ -13,9 +29,19 @@ Most discovery matches the *surface* of music (genre, tempo, audio fingerprint).
 3. **Steer live** — *more like this / change the mood / raise the energy* reshape the upcoming queue without interrupting the current track.
 4. **See it** — a 3D **emotional compass** (12-emotion wheel) turns to your dominant feeling and traces the path the playlist takes.
 
+## Features
+
+- **Mood in, music out** — pick emotions on the wheel or describe a feeling in natural language.
+- **A journey, not a list** — playlists follow an emotional *trajectory* with an arc.
+- **Live steering** — reshape the path mid-listen (deepen / evolve / escalate) without cutting the current track.
+- **3D emotional compass** — a 12-emotion wheel that turns to your mood and draws the path travelled.
+- **Lyrics-grounded** — songs chosen by what they *say*; surfaces the cited line (Musixmatch richsync).
+- **Mobile-first + desktop** — compass-first portrait layout and a desktop split view.
+- **Never dies** — mock fallback on every endpoint, so the demo always runs.
+
 ## Live
 
-- **App (frontend):** https://lyra-green-chi.vercel.app
+- **App:** https://lyra-green-chi.vercel.app
 - **Demo video:** _TBD_
 
 ## Architecture
@@ -80,7 +106,7 @@ ANTHROPIC_API_KEY=…
 
 Then point the frontend at it: `BACKEND_URL=http://localhost:8010` in `web/.env.local`.
 
-## Deploy — where it runs
+## Deploy
 
 Frontend and backend deploy **separately**, each where it fits best:
 
@@ -94,3 +120,15 @@ Both Vercel and Replit are Musicathon partners.
 ## Musixmatch compliance
 
 No Musixmatch content is persisted: lyrics / richsync / analysis are fetched **real-time per session** and not stored. Only our own artifacts (the macro-node name embeddings) are cached. Audio is **not** Musixmatch content (iTunes/Deezer), so it sits outside the constraint.
+
+## Links
+
+- **Live app:** https://lyra-green-chi.vercel.app
+- **Submission copy:** [`SUBMISSION.md`](./SUBMISSION.md)
+- **Repo:** https://github.com/dr-zaib/Lyra_musicathon
+- **Issues:** https://github.com/dr-zaib/Lyra_musicathon/issues
+- **Demo video:** _TBD_
+
+## License
+
+_TBD — built for the **Musixmatch Musicathon 2026**. Add a `LICENSE` file before open-sourcing._
