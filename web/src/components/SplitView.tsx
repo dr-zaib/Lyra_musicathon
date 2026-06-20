@@ -42,6 +42,15 @@ type QueueItem = { track: TrackCandidate; verse: string | null; reason: string |
 
 const MAX_PICKS = 3; // the shape holds at most 3 emotions (FIFO of the last 3 presses)
 
+// A tiny silent WAV used to "unlock" the <audio> element on the first user gesture.
+// Browser autoplay policies (Chrome/Safari/Firefox, all OSes) block a programmatic
+// play() that isn't tied to a user gesture — and the entry track's play() runs only
+// AFTER the /entry + /preview fetches, by which point the click's activation has
+// expired. Playing this once inside the first gesture marks the element as
+// user-activated, so every later play() (entry track, auto-advance) is allowed.
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
+
 // Musixmatch gives no audio → enrich each track with a 30s preview client-side.
 // ISRC-first (Deezer exact match), text fallback — the route handles the strategy.
 async function enrichTrack(t: TrackCandidate): Promise<TrackCandidate> {
@@ -136,6 +145,38 @@ export default function SplitView() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const audioPrimed = useRef(false);
+
+  // Unlock audio on the first user gesture (see SILENT_WAV): play a silent clip while
+  // we still have the gesture's activation, so the entry track — whose play() lands a
+  // couple of network awaits later — is allowed to start on its own (no "press next").
+  const primeAudio = useCallback(() => {
+    const a = audioRef.current;
+    if (!a || audioPrimed.current) return;
+    audioPrimed.current = true;
+    try {
+      a.muted = true;
+      a.src = SILENT_WAV;
+      const p = a.play();
+      const done = () => { a.pause(); a.currentTime = 0; a.muted = false; a.removeAttribute("src"); };
+      if (p && typeof p.then === "function") p.then(done).catch(() => { a.muted = false; });
+      else done();
+    } catch { a.muted = false; }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const prime = () => primeAudio();
+    // `once` removes each listener after it fires; cover pointer, touch and keyboard.
+    window.addEventListener("pointerdown", prime, { once: true });
+    window.addEventListener("touchstart", prime, { once: true });
+    window.addEventListener("keydown", prime, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", prime);
+      window.removeEventListener("touchstart", prime);
+      window.removeEventListener("keydown", prime);
+    };
+  }, [primeAudio]);
 
   const playing = queue.length > 0;
   const playingRef = useRef(false);
@@ -548,7 +589,7 @@ export default function SplitView() {
         ref={audioRef}
         onTimeUpdate={(e) => onTimeUpdate(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-        onEnded={() => { if (index < queue.length - 1) next(); else setIsPlaying(false); }}
+        onEnded={() => { if (!queue.length) return; if (index < queue.length - 1) next(); else setIsPlaying(false); }}
       />
 
       {settingsOpen && <Settings settings={settings} setSettings={setSettings} onClose={() => setSettingsOpen(false)} />}
