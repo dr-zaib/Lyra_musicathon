@@ -1,13 +1,21 @@
 <!-- ⚠️ DRAFT submission copy — written by Alberto's Claude.
      Axel (and his Claude): on pull, review · edit · confirm. When agreed, delete this banner.
-     This is the single source of truth for the Musicathon submission (one-liner · description · tags);
-     we copy from here into the submission form so the repo and the form never drift. -->
+     Single source of truth for the Musicathon submission — copy each field below into the
+     form so repo and form never drift. Fields are in the form's order. -->
 
-# Lyra
+# Lyra — Musicathon submission
 
-**Tell Lyra how you feel — it builds a playlist that travels your emotions, choosing songs by what their lyrics actually say.**
+Fields below follow the submission form order: **One-liner → Full description → Tags**. Copy each into its field.
 
 ---
+
+## 1 · One-liner
+
+> Tell Lyra how you feel — it builds a playlist that travels your emotions, choosing songs by what their lyrics actually say.
+
+---
+
+## 2 · Full description  *(markdown supported)*
 
 ### The idea
 
@@ -38,12 +46,8 @@ Music discovery today matches the *surface*: genre, tempo, an audio fingerprint.
 
 ---
 
-## Submission fields
+## 3 · Tags
 
-**One-liner**
-> Tell Lyra how you feel — it builds a playlist that travels your emotions, choosing songs by what their lyrics actually say.
-
-**Tags**
 > `ai` · `discovery` · `lyrics` · `web` · `mobile`
 
-<!-- Live link + demo video go in their dedicated submission fields, not here. -->
+<!-- Live link + demo video go in their own dedicated submission fields, not here. -->
