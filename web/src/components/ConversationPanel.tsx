@@ -101,8 +101,9 @@ export default function ConversationPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col p-4 pb-5">
-      {/* reset (start over) — top-right */}
-      {canReset && !minimal && (
+      {/* reset (start over) — desktop: top-right of the panel. (Mobile renders it lower, just
+          above the input, so it isn't orphaned in the middle of the screen.) */}
+      {canReset && !minimal && !floating && (
         <div className="flex justify-end">
           <button onClick={onReset} aria-label="start over" title="start over" className="flex h-8 w-8 items-center justify-center rounded-full text-base text-muted transition hover:bg-bg-elev hover:text-fg">↺</button>
         </div>
@@ -133,6 +134,13 @@ export default function ConversationPanel({
           {pending && <ThinkingIndicator floating={floating} />}
         </div>
       ))}
+
+      {/* mobile: reset sits down here (just above the input), not orphaned mid-screen */}
+      {canReset && !minimal && floating && (
+        <div className="flex shrink-0 justify-end pb-1.5">
+          <button onClick={onReset} aria-label="start over" title="start over" className="flex h-8 w-8 items-center justify-center rounded-full text-base text-muted transition hover:bg-bg-elev hover:text-fg">↺</button>
+        </div>
+      )}
 
       {/* the input bar — the big "describe" box + the steer. A hairline rule sets it apart
           from the chat above (clear "this is the conversation / these are the controls").
