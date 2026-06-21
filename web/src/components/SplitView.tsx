@@ -114,18 +114,30 @@ const planeDist = (a: MacroNode, b: MacroNode) =>
 const nearestBy = (n: MacroNode, pool: MacroNode[]): MacroNode =>
   pool.length ? pool.reduce((best, m) => (planeDist(n, m) < planeDist(n, best) ? m : best), pool[0]) : n;
 
-// evolution: advance each emotion to the NEXT region in a circular walk around the wheel
-// (R1→R2→R3→R4→R1, the angular order), nearest node in that region. Repeated evolution thus
-// keeps exploring — it tours the whole wheel instead of ping-ponging between two nodes.
-const evolveNode = (n: MacroNode) => nearestBy(n, REGIONS[(regionOf(n) + 1) % REGIONS.length]);
-// escalation: replace each with the nearest emotion at HIGHER arousal (energy = the y axis);
-// if already at the top, keep it.
+// escalation: replace each emotion with the nearest one at HIGHER arousal (energy = the y
+// axis); if already at the top, keep it. escalate legitimately funnels toward the high-energy
+// peak and may converge to 1–2 — that IS the paradigm ("you've maxed out the energy").
 const escalateNode = (n: MacroNode) => nearestBy(n, ALL_NODES.filter((m) => m.y > TAXONOMY[n].y + 0.02).map((m) => m.name));
 
+// evolution: advance each emotion to the NEXT region (R1→R2→R3→R4→R1, angular order) and
+// assign DISTINCT nodes (nearest-available). This keeps the constellation at 3 distinct and
+// touring the whole wheel — and RESTORES 3 even from a collapsed (duplicate) input, e.g. after
+// escalation has converged. Each region has 3 nodes, so 3 distinct are always assignable.
+function evolvePicks(picks: MacroNode[]): MacroNode[] {
+  const used = new Set<MacroNode>();
+  return picks.map((n) => {
+    const region = REGIONS[(regionOf(n) + 1) % REGIONS.length];
+    const ordered = [...region].sort((a, b) => planeDist(n, a) - planeDist(n, b));
+    const choice = ordered.find((c) => !used.has(c)) ?? ordered[0];
+    used.add(choice);
+    return choice;
+  });
+}
+
 // The DESTINATION constellation a mode re-selects the picks into. deepen stays put (start =
-// end = same constellation → similar tracks); evolve/escalate move each emotion per the rule.
+// end → similar tracks); evolve tours to 3 distinct different-region nodes; escalate climbs.
 function destinationPicks(shape: TrajectoryShape, picks: MacroNode[]): MacroNode[] {
-  if (shape === "evolve") return picks.map(evolveNode);
+  if (shape === "evolve") return evolvePicks(picks);
   if (shape === "escalate") return picks.map(escalateNode);
   return picks; // deepen
 }
