@@ -1,6 +1,6 @@
-# How Lyra works (engine + agent)
+# How lyra works (engine + agent)
 
-The listener expresses a feeling — in words or by touching the wheel — and Lyra
+The listener expresses a feeling — in words or by touching the wheel — and lyra
 builds an **emotional journey** of songs pulled *by meaning* from the whole
 Musixmatch catalog, citing the **line** that marks each passage.
 

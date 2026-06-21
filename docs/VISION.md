@@ -1,19 +1,19 @@
-# Lyra — Product Vision
+# lyra — Product Vision
 
-> The extended product document: what Lyra is meant to be, the full experience and
+> The extended product document: what lyra is meant to be, the full experience and
 > architecture, **what the Musicathon demo deliberately scoped down (and why)**, and the
 > roadmap from MVP to product. For the 1-page elevator version see [`PITCH.md`](./PITCH.md);
 > for the technical walkthrough of the demo see [`HOW_IT_WORKS.md`](./HOW_IT_WORKS.md).
 
 ---
 
-## 1. What Lyra is
+## 1. What lyra is
 
-**Lyra is a lyrics-first music *agent* — an agentic recommender that understands songs by what their words actually say, and walks a listener through an emotional journey rather than handing them a flat list.**
+**lyra is a lyrics-first music *agent* — an agentic recommender that understands songs by what their words actually say, and walks a listener through an emotional journey rather than handing them a flat list.**
 
-Positioning matters: **Lyra is not another DSP, and not a chatbot.** It is **Musixmatch's lyrics-intelligence layer** that an existing streaming service (Spotify, Apple Music, a regional DSP…) plugs in to make its own catalog *understood by meaning* (B2B2C). The world doesn't need more players; it needs the ones we have to be *useful*. Lyra exists to showcase the value of Musixmatch's database: a DSP integrates it to understand listeners by **feeling and theme**, before Musixmatch ever builds a player of its own.
+Positioning matters: **lyra is not another DSP, and not a chatbot.** It is **Musixmatch's lyrics-intelligence layer** that an existing streaming service (Spotify, Apple Music, a regional DSP…) plugs in to make its own catalog *understood by meaning* (B2B2C). The world doesn't need more players; it needs the ones we have to be *useful*. lyra exists to showcase the value of Musixmatch's database: a DSP integrates it to understand listeners by **feeling and theme**, before Musixmatch ever builds a player of its own.
 
-The thesis: **the richest signal in music is the most underused.** Every mainstream recommender matches the *surface* — genre, tempo, an audio fingerprint, collaborative-filtering co-listens. But the reason a song *lands* is usually in the words: the theme, the story, the feeling underneath. Lyra starts there.
+The thesis: **the richest signal in music is the most underused.** Every mainstream recommender matches the *surface* — genre, tempo, an audio fingerprint, collaborative-filtering co-listens. But the reason a song *lands* is usually in the words: the theme, the story, the feeling underneath. lyra starts there.
 
 The LLM is **plumbing** (it reads the feeling and narrates); the **engine — the recsys — is the product.**
 
@@ -22,12 +22,12 @@ The LLM is **plumbing** (it reads the feeling and narrates); the **engine — th
 ## 2. The full experience
 
 ### 2.1 Meet the listener where they are
-- **Natural language in.** Describe a feeling the way you'd say it to a friend — *"restless but quietly hopeful"* — and Lyra resolves it into a weighted emotional state.
+- **Natural language in.** Describe a feeling the way you'd say it to a friend — *"restless but quietly hopeful"* — and lyra resolves it into a weighted emotional state.
 - **The wheel.** Or pick up to three emotions on a circumplex of twelve macro-emotions. Text and taps feed **one** model, not two.
-- **Voice & ambient (vision).** Speak your mood (STT in) and let Lyra *speak back* (TTS narration, music ducking under her voice). Beyond explicit input: an ambient, near-zero-input "readiness" that reads implicit feedback (what you skip, what you stay with) and light context (e.g. driving) — because the point that *you often can't name your mood* is a feature, not a gap.
+- **Voice & ambient (vision).** Speak your mood (STT in) and let lyra *speak back* (TTS narration, music ducking under her voice). Beyond explicit input: an ambient, near-zero-input "readiness" that reads implicit feedback (what you skip, what you stay with) and light context (e.g. driving) — because the point that *you often can't name your mood* is a feature, not a gap.
 
 ### 2.2 A journey, not a pile
-From the starting feeling Lyra plots a **trajectory** across the emotional space:
+From the starting feeling lyra plots a **trajectory** across the emotional space:
 - **Deep dive** — settle deeper into the same feeling.
 - **Evolution** — move to an adjacent or distant emotional region; repeated, it explores the whole wheel.
 - **Escalation** — climb in energy/intensity.
@@ -46,11 +46,14 @@ The same lyrics-understanding engine powers more than discovery:
 - **Learn** *(vision)* — an adaptive **songwriting tutor** that curates real lyrical examples for what you're trying to write and evolves with your feedback, with fingerprint/originality checks (e.g. Sentinel).
 - **Memory** *(vision)* — resurfaces a song you loved a year ago, in the same season or emotional moment.
 
+### 2.6 Mobile-first — where music actually happens
+Music is lived on the phone, and DSPs are **mobile-first** — so lyra is too. The build ships a **dedicated mobile experience**, not a shrunk desktop page: a portrait-tuned **compass-first** layout, a keyboard-aware composer (the input rides above the on-screen keyboard), the steer controls and a slim player — with a desktop split view as the secondary surface. Since lyra is meant to **embed inside a host DSP** (overwhelmingly used on mobile), the phone is the primary surface, not a responsive afterthought.
+
 ---
 
 ## 3. Production architecture
 
-In production Lyra is a **layer inside a host DSP**. Three things come from the DSP; Lyra itself stays the same:
+In production lyra is a **layer inside a host DSP**. Three things come from the DSP; lyra itself stays the same:
 
 | Concern | In production (host DSP) | In the demo (stand-in) |
 |---|---|---|
@@ -92,11 +95,11 @@ What the MVP *does* show, for real: natural-language **and** wheel input → a n
 **Near term (post-MVP):**
 - Wire mid-journey redirect into the UI; variable journey duration ("arrive, then radio").
 - Reaction learning: skip/replay as signals for continuous, in-session re-ranking.
-- ElevenLabs voice-out (Lyra speaks her transitions; music ducks).
+- ElevenLabs voice-out (lyra speaks her transitions; music ducks).
 - "Show translation" of the cited verse (Musixmatch translation surface) and an opt-in per-language catalog filter.
 
 **Mid term:**
-- The **host-DSP integration**: real catalog, real user profile/history, real streaming — Lyra as a drop-in layer.
+- The **host-DSP integration**: real catalog, real user profile/history, real streaming — lyra as a drop-in layer.
 - Persistent semantic layer (licensed lyric embeddings / Music Lens) for within-node selection at catalogue scale.
 - Real user profiles + cold-start handling.
 

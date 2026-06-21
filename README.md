@@ -1,15 +1,15 @@
-# Lyra
+# lyra
 
-**Tell Lyra how you feel — it builds a playlist that travels your emotions, choosing songs by what their lyrics actually say.**
+**Tell lyra how you feel — it builds a playlist that travels your emotions, choosing songs by what their lyrics actually say.**
 
-Most discovery matches the *surface* of music (genre, tempo, audio fingerprint). Lyra matches **meaning**: it reads lyrics, places every track in an emotional space, meets you where you are, and walks you somewhere — citing the **line** that marks each passage.
+Most discovery matches the *surface* of music (genre, tempo, audio fingerprint). lyra matches **meaning**: it reads lyrics, places every track in an emotional space, meets you where you are, and walks you somewhere — citing the **line** that marks each passage.
 
 <!-- TODO: hero screenshot / demo GIF goes here — image to be chosen with Alberto. -->
 <!-- screenshot placeholder -->
 
 > **This repo is a focused MVP** — a self-contained *Discover* experience that proves the
 > engine end-to-end on real Musixmatch data, scoped by the contest's no-persistence rules.
-> The full product (Lyra as a lyrics-intelligence layer a DSP plugs in, plus Learn/Memory,
+> The full product (lyra as a lyrics-intelligence layer a DSP plugs in, plus Learn/Memory,
 > voice, variable journeys, reaction-learning) lives in the vision doc.
 >
 > 📄 [`SUBMISSION.md`](./SUBMISSION.md) — submission copy · [`docs/PITCH.md`](./docs/PITCH.md) — elevator pitch · [`docs/VISION.md`](./docs/VISION.md) — full product vision & roadmap · [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md) — technical walkthrough
@@ -30,7 +30,7 @@ Most discovery matches the *surface* of music (genre, tempo, audio fingerprint).
 ## How it works
 
 1. **Say how you feel** — pick up to 3 emotions, or type it in plain language (*"restless but quietly hopeful"*). A Claude agent reads the text into the same 3-emotion state.
-2. **Lyra plots a journey** — not a flat list but a *trajectory*: an entry track, then songs that move through the emotional space toward where you're heading.
+2. **lyra plots a journey** — not a flat list but a *trajectory*: an entry track, then songs that move through the emotional space toward where you're heading.
 3. **Steer live** — *more like this / change the mood / raise the energy* reshape the upcoming queue without interrupting the current track.
 4. **See it** — a 3D **emotional compass** (12-emotion wheel) turns to your dominant feeling and traces the path the playlist takes.
 

@@ -1,4 +1,4 @@
-# Lyra engine
+# lyra engine
 
 The deterministic core: it turns a **seed mood** into a **trajectory** — a short
 emotional journey across the 12 macro-nodes — pulling real songs from the whole
