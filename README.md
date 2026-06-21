@@ -18,7 +18,7 @@ Most discovery matches the *surface* of music (genre, tempo, audio fingerprint).
 
 - [How it works](#how-it-works)
 - [Features](#features)
-- [Live](#live)
+- [Demo](#demo)
 - [Architecture](#architecture)
 - [Tech stack](#tech-stack)
 - [Run locally](#run-locally)
@@ -44,10 +44,11 @@ Most discovery matches the *surface* of music (genre, tempo, audio fingerprint).
 - **Mobile-first + desktop** — compass-first portrait layout and a desktop split view.
 - **Never dies** — mock fallback on every endpoint, so the demo always runs.
 
-## Live
+## Demo
 
-- **App:** https://lyra-green-chi.vercel.app
 - **Demo video:** _TBD_
+<!-- Once the backend deploy is wired, add:  **App:** https://lyra-green-chi.vercel.app -->
+
 
 ## Architecture
 
@@ -128,7 +129,6 @@ No Musixmatch content is persisted: lyrics / richsync / analysis are fetched **r
 
 ## Links
 
-- **Live app:** https://lyra-green-chi.vercel.app
 - **Submission copy:** [`SUBMISSION.md`](./SUBMISSION.md)
 - **Elevator pitch:** [`docs/PITCH.md`](./docs/PITCH.md)
 - **Product vision & roadmap:** [`docs/VISION.md`](./docs/VISION.md)
