@@ -696,9 +696,9 @@ export default function SplitView() {
             <span className="font-display text-2xl font-medium lowercase leading-none tracking-tight">lyra<span className="text-accent">.</span></span>
             {settingsBtn}
           </div>
-          <div className="mt-2.5 min-h-5 space-y-1.5 text-center">
+          <div className="mt-2.5 min-h-6 space-y-1.5 text-center">
             {playing ? (
-              <LyricBanner verse={current?.verse ?? null} mock={false} />
+              <LyricBanner verse={current?.verse ?? null} mock={false} big />
             ) : (
               <>
                 {/* the welcome title fades UP and out once you start (a pick) — a soft exit, not a pop */}
