@@ -4,8 +4,9 @@
 
 Most discovery matches the *surface* of music (genre, tempo, audio fingerprint). lyra matches **meaning**: it reads lyrics, places every track in an emotional space, meets you where you are, and walks you somewhere — citing the **line** that marks each passage.
 
-<!-- TODO: hero screenshot / demo GIF goes here — image to be chosen with Alberto. -->
-<!-- screenshot placeholder -->
+<p align="center">
+  <img src="docs/cover.png" alt="lyra — the emotional compass mid-journey, citing the line that marks the passage" width="300" />
+</p>
 
 > **This repo is a focused MVP** — a self-contained *Discover* experience that proves the
 > engine end-to-end on real Musixmatch data, scoped by the contest's no-persistence rules.
