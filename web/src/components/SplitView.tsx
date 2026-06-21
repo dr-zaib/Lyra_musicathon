@@ -507,11 +507,23 @@ export default function SplitView() {
   };
   const seek = (t: number) => { const a = audioRef.current; if (a) a.currentTime = t; };
 
+  // Build the narrated journey shortly after playback starts — INDEPENDENT of audio playback,
+  // so the cited verses are ready even if autoplay is blocked (the audio-time trigger below is
+  // a backup). Skips surprise mode (no picks → no seed → nothing to build).
+  useEffect(() => {
+    if (!playing || autoGenFired.current || !picksRef.current.length) return;
+    autoGenFired.current = true;
+    const id = setTimeout(() => rebuildTail(picksRef.current, "deepen", picksRef.current), 1000);
+    return () => clearTimeout(id);
+  }, [playing, rebuildTail]);
+
   const onTimeUpdate = (t: number) => {
     setCurrentTime(t);
-    // hide the gen time: near the entry track's end, auto-build the journey (silent)
-    if (!autoGenFired.current && playingRef.current && duration > 0 && duration - t <= 8) {
+    // backup trigger: if the effect above somehow didn't fire, build the journey once audio runs
+    if (!autoGenFired.current && playingRef.current && t >= 1.5) {
       autoGenFired.current = true;
+      // build the narrated journey EARLY (not at the entry's end) so cited verses are ready
+      // almost immediately — one skip past the entry track lands on a real cited line.
       rebuildTail(picksRef.current, "deepen", picksRef.current); // default journey: deep dive on the mood
     }
   };
@@ -741,7 +753,7 @@ export default function SplitView() {
               number → max-h-[…]. The pips get their own row beneath it (clear of the ring). */}
           <section className="flex flex-1 flex-col" onWheel={onWheel} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             {/* the cited lyric, above the wheel */}
-            <div className="flex shrink-0 justify-center px-6 pt-1"><div className="w-full max-w-[440px]"><LyricBanner verse={current?.verse ?? null} /></div></div>
+            <div className="flex shrink-0 justify-center px-6 pt-1"><div className="w-full max-w-[440px]"><LyricBanner verse={current?.verse ?? null} mock={false} /></div></div>
             <div className="flex min-h-0 flex-1 items-center justify-center">
               {!viewResolved ? null : useCompass && !isMobile ? (
                 <div className="h-full w-full"><CompassScene dominant={compassHeading} moodColor={compassColor} comprehension={comprehension} trail={picks} onSelect={pickEmotion} /></div>
