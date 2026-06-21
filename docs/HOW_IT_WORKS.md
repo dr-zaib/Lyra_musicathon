@@ -67,7 +67,7 @@ sequenceDiagram
     FE->>EN: POST /journey (seed_distribution to end_distribution)
     EN->>MX: analysis.search + richsync (per step)
     EN-->>FE: trajectory — tracks + cited verses
-    FE->>U: queue rebuilds; compass turns
+    FE->>U: queue rebuilds, compass turns
 ```
 
 **The split that matters:** the **engine** produces the structured `Trajectory` (deterministic);
@@ -92,7 +92,7 @@ flowchart TD
     B --> C["per target: analysis.search<br/>~60 candidates (page varied)"]
     C --> D["soft-map: moods/themes → 12-node distribution<br/>(mpnet embeddings)"]
     D --> E["rank by nearness to target"]
-    E --> F["top-K=5 sampling<br/>+ popularity floor + ban-list + artist|title dedup"]
+    E --> F["top-K=5 sampling<br/>+ popularity floor + ban-list + artist+title dedup"]
     F --> G["richsync → cited verse timestamp"]
     G --> H["TrajectoryStep"]
 ```
