@@ -475,7 +475,16 @@ export default function SplitView() {
   }, [settings.language, startPlayback, rebuildTail]);
 
   // surprise me → start from pure serendipity (no picks)
-  const surprise = useCallback(() => { startPlayback([]); }, [startPlayback]);
+  // surprise me → serendipity, but ALIVE: seed 3 random emotions so the compass turns, a
+  // journey builds and cited verses appear — instead of empty playback with no mood read.
+  const surprise = useCallback(() => {
+    const names = ALL_NODES.map((n) => n.name);
+    const rnd: MacroNode[] = [];
+    while (rnd.length < MAX_PICKS && names.length) rnd.push(names.splice(Math.floor(Math.random() * names.length), 1)[0]);
+    picksRef.current = rnd; setPicks(rnd);
+    modeRef.current = "deepen"; setMode("deepen");
+    startPlayback(rnd);
+  }, [startPlayback]);
 
   // steer: pick a mode → light it, RE-SELECT the emotions per the mode's paradigm (the
   // constellation morphs), and rebuild the tail as a journey from the current constellation
