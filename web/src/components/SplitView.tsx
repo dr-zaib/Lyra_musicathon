@@ -394,15 +394,27 @@ export default function SplitView() {
 
   const refill = useCallback(async () => {
     try {
-      const remaining = queueRef.current.slice(indexRef.current).map((q) => q.track);
-      const res = await fetch("/api/refill", {
+      // extend the queue via /journey (not /refill) so the new tracks carry their cited
+      // verse + transition reason — otherwise the player dead-ended on verse-less tracks and
+      // the lyric froze. Continues the journey from the current constellation/mode.
+      const dist = freqDistribution(picksRef.current);
+      const seedMood = dominantOf(dist);
+      if (!seedMood) return; // no read yet → nothing to extend toward
+      const body: JourneyRequest = { seed_mood: seedMood, seed_distribution: dist, end_distribution: dist, shape: modeRef.current, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current };
+      const res = await fetch("/api/journey", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ remaining, exclude_isrcs: playedIsrcs.current, known_new: settings.knownNew, language: settings.language, session_id: sessionId.current }),
+        body: JSON.stringify(body),
       });
-      const more: TrackCandidate[] = await res.json();
-      const enriched = await Promise.all(more.map(enrichTrack));
-      setQueue((q) => [...q, ...enriched.map((t) => ({ track: t, verse: null, reason: null }))]);
+      if (!res.ok) return;
+      const traj: Trajectory = await res.json();
+      const seen = new Set(queueRef.current.map((q) => q.track.track_id));
+      const steps = traj.steps.filter((s) => !seen.has(s.selected_track.track_id));
+      if (!steps.length) return;
+      const items = await Promise.all(
+        steps.map(async (s) => ({ track: await enrichTrack(s.selected_track), verse: s.citable_verse ?? null, reason: s.transition_reason ?? null })),
+      );
+      setQueue((q) => [...q, ...items]);
     } catch {
       // best-effort
     }

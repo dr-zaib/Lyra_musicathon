@@ -25,13 +25,16 @@ export default function LyricBanner({ verse, mock = true, big = false }: { verse
   if (!text) return <div className={h} />; // hold the line's height so layout doesn't jump
   return (
     <div className={`relative overflow-hidden ${h}`}>
-      <AnimatePresence mode="wait">
+      {/* NO mode="wait": the new line must cross-fade IN immediately on skip, not wait for the
+          old one to finish leaving (that made the verse lag a beat behind the track / look stuck
+          on rapid skips). Both spans are absolute-positioned, so they overlap cleanly. */}
+      <AnimatePresence initial={false}>
         <motion.span
           key={text}
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -5 }}
-          transition={{ duration: 0.55, ease: "easeOut" }}
+          transition={{ duration: 0.28, ease: "easeOut" }}
           className={`absolute inset-0 block truncate text-center font-display italic text-muted ${big ? "text-lg" : "text-sm"}`}
         >
           {text}
