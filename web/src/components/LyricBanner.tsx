@@ -21,7 +21,7 @@ export default function LyricBanner({ verse, mock = true, big = false }: { verse
     return () => clearInterval(id);
   }, [verse, mock]);
   const text = verse ?? (mock ? MOCK[i] : null);
-  const h = big ? "h-6" : "h-5"; // taller line to fit the slightly larger desktop type
+  const h = big ? "h-7" : "h-5"; // taller line to fit the larger desktop type
   if (!text) return <div className={h} />; // hold the line's height so layout doesn't jump
   return (
     <div className={`relative overflow-hidden ${h}`}>
@@ -32,7 +32,7 @@ export default function LyricBanner({ verse, mock = true, big = false }: { verse
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -5 }}
           transition={{ duration: 0.55, ease: "easeOut" }}
-          className={`absolute inset-0 block truncate text-center font-display italic text-muted ${big ? "text-base" : "text-sm"}`}
+          className={`absolute inset-0 block truncate text-center font-display italic text-muted ${big ? "text-lg" : "text-sm"}`}
         >
           {text}
         </motion.span>
