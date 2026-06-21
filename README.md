@@ -7,7 +7,12 @@ Most discovery matches the *surface* of music (genre, tempo, audio fingerprint).
 <!-- TODO: hero screenshot / demo GIF goes here — image to be chosen with Alberto. -->
 <!-- screenshot placeholder -->
 
-> Submission copy (one-liner · description · tags): [`SUBMISSION.md`](./SUBMISSION.md)
+> **This repo is a focused MVP** — a self-contained *Discover* experience that proves the
+> engine end-to-end on real Musixmatch data, scoped by the contest's no-persistence rules.
+> The full product (Lyra as a lyrics-intelligence layer a DSP plugs in, plus Learn/Memory,
+> voice, variable journeys, reaction-learning) lives in the vision doc.
+>
+> 📄 [`SUBMISSION.md`](./SUBMISSION.md) — submission copy · [`docs/PITCH.md`](./docs/PITCH.md) — elevator pitch · [`docs/VISION.md`](./docs/VISION.md) — full product vision & roadmap · [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md) — technical walkthrough
 
 ## Table of contents
 
@@ -125,6 +130,9 @@ No Musixmatch content is persisted: lyrics / richsync / analysis are fetched **r
 
 - **Live app:** https://lyra-green-chi.vercel.app
 - **Submission copy:** [`SUBMISSION.md`](./SUBMISSION.md)
+- **Elevator pitch:** [`docs/PITCH.md`](./docs/PITCH.md)
+- **Product vision & roadmap:** [`docs/VISION.md`](./docs/VISION.md)
+- **How it works (technical):** [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md)
 - **Repo:** https://github.com/dr-zaib/Lyra_musicathon
 - **Issues:** https://github.com/dr-zaib/Lyra_musicathon/issues
 - **Demo video:** _TBD_

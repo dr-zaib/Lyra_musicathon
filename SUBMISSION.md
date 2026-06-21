@@ -1,6 +1,4 @@
-<!-- ⚠️ DRAFT submission copy — written by Alberto's Claude.
-     Axel (and his Claude): on pull, review · edit · confirm. When agreed, delete this banner.
-     Single source of truth for the Musicathon submission — copy each field below into the
+<!-- Single source of truth for the Musicathon submission — copy each field below into the
      form so repo and form never drift. Fields are in the form's order. -->
 
 # Lyra — Musicathon submission
@@ -29,7 +27,7 @@ Music discovery today matches the *surface*: genre, tempo, an audio fingerprint.
 
 **3 · Steer in real time.** *More like this*, *change the mood*, *raise the energy* — each reshapes the upcoming queue and the path it takes, without cutting off the song that's playing. You're always driving.
 
-**4 · See the feeling.** A living 3D **emotional compass** — a twelve-emotion wheel — turns to your dominant feeling and traces the constellation of where the playlist has been and where it's going. The depth isn't decoration: it maps the emotional distance you travel.
+**4 · See the feeling.** A living 3D **emotional compass** — a twelve-emotion wheel — turns to your dominant feeling and traces the constellation of your emotions; each steer turns it toward where the journey is heading. The depth isn't decoration: it maps the emotional distance you travel.
 
 ### Why it's different
 
@@ -43,7 +41,11 @@ Music discovery today matches the *surface*: genre, tempo, an audio fingerprint.
 - **Emotional engine** — sentence-transformer embeddings (`all-mpnet-base-v2`) place each track on a twelve-node emotion taxonomy (a circumplex of valence × energy); a "journey" is a walk across that space.
 - **Claude (Anthropic)** — reads free-text mood into the emotion model and shapes the trajectory (deepen / evolve / escalate).
 - **Frontend** — Next.js with a `react-three-fiber` 3D compass; mobile compass-first layout plus a desktop split view. Real 30-second previews via Deezer/iTunes, since Musixmatch is lyrics, not audio.
-- **Deployed on partner infra** — frontend on **Vercel**, backend on a **Replit** Reserved VM (both Musicathon partners).
+- **Infra** — frontend on **Vercel**; the backend (FastAPI + ML engine) runs on **Replit** (both Musicathon partners).
+
+### A focused MVP — with a real product behind it
+
+This build is a deliberate MVP: a self-contained **Discover** experience that proves the engine end-to-end on real Musixmatch data, scoped by the contest's **no-persistence / real-time** rules (so: within-session, with stand-ins for a host DSP's catalog, profile and streaming). The full product — **Lyra as a lyrics-intelligence layer a DSP plugs in (B2B2C)**, plus the Learn/Memory modes, voice, variable journeys and reaction-learning — is documented in [`docs/VISION.md`](./docs/VISION.md).
 
 ---
 

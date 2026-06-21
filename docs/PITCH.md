@@ -1,7 +1,15 @@
-Lyra — the lyrics-first music agent.
-The problem. Every recommender — Spotify, Apple Music — treats lyrics as metadata or ignores them. Yet lyrics carry what we actually connect to: the themes, the emotion, the story. The richest signal in music is the most underused.
-The idea. Lyra puts lyrics first. It understands the semantic and emotional content of songs and turns it into journeys. You start from a mood or theme, and Lyra offers several directions to travel in — go deeper into the same feeling, or evolve into an adjacent one — building each path in real time and adapting as you listen. It's an agent, not a static playlist: it reasons over where you are and where you could go next, citing the actual lines from the lyrics that mark each transition, and learning within the session from the songs you actually stay with.
-Why Musixmatch. This only works on top of the world's largest lyrics catalogue. We use lyrics analysis, themes with their citable quotes, and richsync as first-class signals — the core of the product. The entire data layer of Lyra is built on the Musixmatch API, with no external data dependencies — including popularity, which we draw from chart.tracks and track_rating rather than third parties.
-Architecture. A discrete graph of macro emotional nodes (our taxonomy), populated in real time per session from Musixmatch's track.lyrics.analysis and track.lyrics.analysis.search. Each song softly maps to nodes via embedding similarity between its Musixmatch moods/themes and our taxonomy labels — preserving Musixmatch's semantic richness inside our structure. The graph is the product's narrative and UX backbone. In a production setting, the same structure scales by adding a persistent semantic layer — vector embeddings of lyrics under commercial licence, or Musixmatch's own Music Lens as an upstream engine — to refine within-node selection at catalogue scale.
-Beyond Discover. The same lyrics-understanding engine extends to two more modes: an adaptive songwriting tutor that curates real examples and evolves with feedback (with Sentinel fingerprint detection for originality checks), and a memory mode that resurfaces a song you loved a year ago in the same season. The audio dimension — voice texture, energy, sonic intensity — integrates naturally via Cyanite as upstream analysis, unlocking trajectory shapes the lyrics alone cannot express.
-Team. Two Music & Acoustic Engineers (Politecnico di Milano): one focused on AI agent engineering and shipping, one a data scientist in ML, recommender systems and solution architecture.
+# Lyra — the lyrics-first music agent
+
+*(Elevator pitch. For the full product vision, architecture and roadmap see [`VISION.md`](./VISION.md).)*
+
+**Tell Lyra how you feel — it builds a playlist that *travels* your emotions, choosing songs by what their lyrics actually say.**
+
+**The problem.** Every recommender — Spotify, Apple Music — treats lyrics as metadata or ignores them. Yet lyrics carry what we actually connect to: the themes, the emotion, the story. The richest signal in music is the most underused.
+
+**The idea.** Lyra puts lyrics first. It understands the semantic and emotional content of songs and turns it into **journeys**: you start from a mood, and Lyra walks you through the emotional space — deeper into the same feeling, or evolving into a new one — building the path in real time and **citing the actual lyric line** that marks each transition. An agent, not a static playlist.
+
+**Why Musixmatch.** This only works on top of the world's largest lyrics catalogue. Lyrics analysis, themes with citable quotes, and richsync are first-class signals — the core of the product. The entire data layer is built on the Musixmatch API, popularity included (`track_rating`, charts), with no external data dependencies.
+
+**What it really is.** Not another player — **Musixmatch's lyrics-intelligence layer that a DSP plugs in** to understand its own catalog by meaning (B2B2C). The hackathon build is a focused MVP that proves the engine end-to-end; the full vision is in [`VISION.md`](./VISION.md).
+
+**Team.** Two Music & Acoustic Engineers (Politecnico di Milano): one focused on AI agent engineering and shipping, one a data scientist in ML, recommender systems and solution architecture.
