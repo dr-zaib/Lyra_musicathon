@@ -12,4 +12,4 @@
 
 **What it really is.** Not another player — **Musixmatch's lyrics-intelligence layer that a DSP plugs in** to understand its own catalog by meaning (B2B2C). The hackathon build is a focused MVP that proves the engine end-to-end; the full vision is in [`VISION.md`](./VISION.md).
 
-**Team.** Two Music & Acoustic Engineers (Politecnico di Milano): one focused on AI agent engineering and shipping, one a data scientist in ML, recommender systems and solution architecture.
+**Team.** Two Audio Signal Processing Engineers: one a data scientist & ML engineer, one a full-stack & DevOps engineer.

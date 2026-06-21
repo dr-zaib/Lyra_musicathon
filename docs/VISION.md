@@ -118,4 +118,4 @@ What the MVP *does* show, for real: natural-language **and** wheel input → a n
 
 ---
 
-*Team — two Music & Acoustic Engineers (Politecnico di Milano): one focused on AI agent engineering and shipping, one a data scientist in ML, recommender systems and solution architecture.*
+*Team — two Audio Signal Processing Engineers: one a data scientist & ML engineer, one a full-stack & DevOps engineer.*
