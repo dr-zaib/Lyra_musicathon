@@ -324,22 +324,23 @@ export default function SplitView() {
   // <audio> only when the current track's preview actually changes, never on a mere
   // queue-array change. This is what keeps the player from restarting/interrupting
   // when you switch mode or add a 4th emotion (only the upcoming queue should change).
-  /* eslint-disable react-hooks/set-state-in-effect -- syncing the <audio> element */
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !current) return;
     const url = current.track.preview_url ?? null;
+    // no playable preview → don't dead-end the player: skip ahead to the next track.
+    // (only stop if there's nothing after it; later tracks may still be loading in.)
+    if (!url) {
+      if (indexRef.current < queueRef.current.length - 1) setIndex((i) => i + 1);
+      else { a.removeAttribute("src"); loadedUrl.current = null; setIsPlaying(false); }
+      return;
+    }
     if (url === loadedUrl.current) return; // same track still playing → don't touch it
     loadedUrl.current = url;
-    if (url) {
-      a.src = url; a.load();
-      a.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-    } else {
-      a.removeAttribute("src"); setIsPlaying(false);
-    }
+    a.src = url; a.load();
+    a.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     if (current.track.isrc && !playedIsrcs.current.includes(current.track.isrc)) playedIsrcs.current.push(current.track.isrc);
   }, [index, queue]); // eslint-disable-line react-hooks/exhaustive-deps
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // first commit → entry track plays immediately (the journey hides behind it)
   const startPlayback = useCallback(async (forPicks: MacroNode[], message?: string) => {
@@ -668,6 +669,13 @@ export default function SplitView() {
         onTimeUpdate={(e) => onTimeUpdate(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onEnded={() => { if (!queue.length) return; if (index < queue.length - 1) next(); else setIsPlaying(false); }}
+        onError={(e) => {
+          // a preview URL that fails to load (expired/region-blocked/404) must not freeze the
+          // player — skip to the next track. Ignore the spurious error from an emptied src.
+          if (!e.currentTarget.getAttribute("src")) return;
+          loadedUrl.current = null;
+          if (index < queue.length - 1) next(); else setIsPlaying(false);
+        }}
       />
 
       {settingsOpen && <Settings settings={settings} setSettings={setSettings} onClose={() => setSettingsOpen(false)} />}
