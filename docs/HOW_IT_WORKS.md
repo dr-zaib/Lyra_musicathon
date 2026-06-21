@@ -20,7 +20,20 @@ The listener expresses a feeling — in words or by touching the wheel — and l
   `shuffle` serendipity path.
 
 ## 2. The HTTP seams
-`web` (Next.js) → `backend` (FastAPI) → engine + Musixmatch. Each `web/src/app/api/*` route
+
+```mermaid
+flowchart LR
+    U(["Listener"]) --> FE["Frontend<br/>wheel · compass · player"]
+    FE -->|"/api/*"| PX["API proxy"]
+    PX -->|"HTTP"| BE["Backend"]
+    PX -.->|"backend down"| MK["Mock engine + agent<br/>(demo never dies)"]
+    BE --> AG["Agent — Claude<br/>interpret"]
+    BE --> EN["Engine<br/>soft-map + trajectory"]
+    EN -->|"analysis.search · analysis.get · richsync"| MX[("Musixmatch API")]
+    FE -.->|"ISRC preview"| AUD[("Deezer / iTunes 30s")]
+```
+
+`web` → `backend` → engine + Musixmatch. Each `web/src/app/api/*` route
 proxies the backend and **falls back to a local mock** (`mockAgent`/`mockEngine`) if it's
 unreachable, so the demo never dies. Endpoints (`backend/app.py`):
 
@@ -35,21 +48,26 @@ unreachable, so the demo never dies. Endpoints (`backend/app.py`):
 
 ## 3. The live flow (in memory — no Musixmatch content persisted)
 
-```
-input: type a mood            OR     tap up to 3 emotions (wheel)
-   │                                    │
-   ▼ AGENT.interpret() (Claude)         ▼ freqDistribution(picks)  (rank-decayed weights)
-   │  text → distribution (≤3 nodes) + shuffle + confidence + shape + end_mood
-   │  (message stays EMPTY — lyra is a recsys, not a chatbot)
-   └───────────────┬────────────────────┘
-                   ▼  POST /entry  → entry candidates → the player starts candidate[0] now
-                   ▼  POST /journey (on a steer / auto-gen) → build_trajectory()
-                        1. operator → targets interpolating START → DESTINATION constellation
-                        2. per target: analysis.search on Musixmatch (by meaning) → ~60 candidates
-                        3. soft-map each candidate's moods/themes → distribution over the 12 nodes
-                        4. pick a track NEAR the target (top-K sampling), popularity floor,
-                           prefer has_richsync, ban-list + artist|title dedup
-                        5. richsync → timestamp of the cited verse
+```mermaid
+sequenceDiagram
+    actor U as Listener
+    participant FE as Frontend
+    participant AG as Agent
+    participant EN as Engine
+    participant MX as Musixmatch
+    U->>FE: type a mood / tap 3 emotions
+    FE->>AG: interpret(text)
+    AG-->>FE: distribution (≤3 nodes) + shuffle + shape
+    Note over AG: message stays empty — recsys, not chatbot
+    FE->>EN: POST /entry
+    EN->>MX: analysis.search
+    MX-->>EN: candidates
+    EN-->>FE: entry candidates → play candidate[0] now
+    U->>FE: choose a steer (deepen / evolve / escalate)
+    FE->>EN: POST /journey (seed_distribution to end_distribution)
+    EN->>MX: analysis.search + richsync (per step)
+    EN-->>FE: trajectory — tracks + cited verses
+    FE->>U: queue rebuilds; compass turns
 ```
 
 **The split that matters:** the **engine** produces the structured `Trajectory` (deterministic);
@@ -65,6 +83,19 @@ the **raw cited verse**, not interpretive blurbs, and `/journey` is faster for i
 | Trajectory engine | `engine/trajectory.py` | operators + `build_trajectory` / `entry_candidates` / `refill_candidates` (parallelized) |
 | Agent | `backend/agent.py` | `interpret` (Claude); `narrate` present but disabled |
 | Contract | `shared/schema.py` ↔ `web/src/lib/types.ts` | identical field-for-field (snake_case) |
+
+**`build_trajectory` per step:**
+
+```mermaid
+flowchart TD
+    A["start_distribution → end_distribution"] --> B["operator: N interpolated targets"]
+    B --> C["per target: analysis.search<br/>~60 candidates (page varied)"]
+    C --> D["soft-map: moods/themes → 12-node distribution<br/>(mpnet embeddings)"]
+    D --> E["rank by nearness to target"]
+    E --> F["top-K=5 sampling<br/>+ popularity floor + ban-list + artist|title dedup"]
+    F --> G["richsync → cited verse timestamp"]
+    G --> H["TrajectoryStep"]
+```
 
 - **Trajectory operators** (`deepen` / `evolve` / `escalate`): a step sequence interpolating from
   `seed_distribution` (where you are) to `end_distribution` (the destination constellation) over the
@@ -89,6 +120,43 @@ the **raw cited verse**, not interpretive blurbs, and `/journey` is faster for i
   `end_distribution`; the upcoming queue rebuilds **without interrupting the current track**.
 - **Two visualizations:** a **3D compass** (react-three-fiber, default) and a **2.5D radar wheel**
   (`?view=2d`), with a **WebGL fallback** to the 2.5D wheel. **Mobile-first** compass layout + desktop split view.
+
+**The 12 emotions** live on a valence × energy circumplex (the taxonomy, at their real coordinates):
+
+```mermaid
+quadrantChart
+    title 12-emotion circumplex (valence x energy)
+    x-axis Negative --> Positive
+    y-axis Low energy --> High energy
+    quadrant-1 uplifted
+    quadrant-2 agitated
+    quadrant-3 withdrawn
+    quadrant-4 tender
+    Joy: [0.80, 0.70]
+    Empowerment: [0.60, 0.86]
+    Awe: [0.60, 0.76]
+    Hope: [0.68, 0.56]
+    Tenderness: [0.62, 0.36]
+    Nostalgia: [0.46, 0.38]
+    Reflection: [0.42, 0.26]
+    Solitude: [0.30, 0.20]
+    Melancholia: [0.24, 0.36]
+    Anxiety: [0.24, 0.70]
+    Anger: [0.17, 0.82]
+    Defiance: [0.36, 0.84]
+```
+
+> The engine groups these into **4 balanced regions of 3** (by angle): *withdrawn* (Melancholia·Solitude·Reflection) · *warm* (Nostalgia·Tenderness·Hope) · *uplifted* (Joy·Awe·Empowerment) · *intense* (Defiance·Anger·Anxiety).
+
+**What each steer does to the constellation:**
+
+```mermaid
+flowchart LR
+    S["your 3-emotion<br/>constellation"]
+    S -->|"deep dive"| D["stay — same region<br/>(similar tracks)"]
+    S -->|"evolution"| E["to the next region<br/>3 distinct · tours the wheel"]
+    S -->|"escalation"| X["up in energy<br/>funnels toward the peak"]
+```
 
 ## 6. While you listen — audio + the cited verse
 - Audio = **30s previews** resolved client-side **ISRC-first via Deezer** (`track/isrc:…`), text

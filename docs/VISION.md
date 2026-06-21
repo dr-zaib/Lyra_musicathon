@@ -53,6 +53,24 @@ Music is lived on the phone, and DSPs are **mobile-first** — so lyra is too. T
 
 ## 3. Production architecture
 
+```mermaid
+flowchart LR
+    subgraph "Host DSP"
+      CAT[("Catalog")]
+      PROF[("User profile<br/>go-to · bans · history")]
+      AUD[("Streaming audio")]
+    end
+    subgraph "lyra — lyrics-intelligence layer"
+      EN["Emotion engine<br/>soft-map + trajectory"]
+    end
+    MX[("Musixmatch<br/>lyrics · analysis · richsync")]
+    CAT <--> EN
+    PROF <--> EN
+    AUD <--> EN
+    EN <--> MX
+    EN --> UX["journey + cited verse → listener"]
+```
+
 In production lyra is a **layer inside a host DSP**. Three things come from the DSP; lyra itself stays the same:
 
 | Concern | In production (host DSP) | In the demo (stand-in) |
