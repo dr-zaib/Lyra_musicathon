@@ -147,4 +147,9 @@ No Musixmatch content is persisted: lyrics / richsync / analysis are fetched **r
 
 ## License
 
-_TBD — built for the **Musixmatch Musicathon 2026**. Add a `LICENSE` file before open-sourcing._
+**Proprietary — source-available, all rights reserved.** © 2026 Alberto Di Maria and Axel.
+The source is public so it can be evaluated (Musixmatch Musicathon 2026) and reviewed, but it
+is **not** open source: no use, copying, modification, distribution, or commercial use is
+permitted without the copyright holders' written consent. Commercial rights are reserved to the
+authors. See [`LICENSE`](./LICENSE). Third-party components (Musixmatch API, Anthropic Claude,
+npm/PyPI deps) keep their own terms.

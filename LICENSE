@@ -1,0 +1,34 @@
+Lyra — Proprietary License (Source-Available, All Rights Reserved)
+Copyright (c) 2026 Alberto Di Maria and Axel (GitHub: dr-zaib). All rights reserved.
+
+The source code in this repository (the "Software") is made publicly visible
+solely so that it can be evaluated and reviewed — in particular by the judges and
+organizers of the Musixmatch Musicathon 2026, and by the general public for
+informational purposes. Making the source visible does NOT make it open source and
+does NOT grant any usage rights.
+
+No license or permission is granted to any person or entity — other than the
+copyright holders named above — to use, run, copy, reproduce, modify, adapt,
+translate, merge, publish, distribute, sublicense, sell, host, or create derivative
+works of the Software, in whole or in part, for any purpose (including any
+commercial purpose), without the prior written permission of the copyright holders.
+
+The right to commercialize, license, or otherwise exploit the Software is reserved
+exclusively to the copyright holders (Alberto Di Maria and Axel). Any commercial
+use, productization, or distribution by anyone else requires their prior written
+agreement.
+
+Third-party components are not covered by this license and remain subject to their
+own terms — including, without limitation, the Musixmatch API, Anthropic Claude, and
+the npm and PyPI packages declared in this project's manifests. Lyrics, richsync, and
+analysis data accessed through the Musixmatch API are the property of Musixmatch
+and/or its rights holders and are used in accordance with the Musixmatch API terms.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
+
+For permissions and commercial inquiries, contact the copyright holders.
