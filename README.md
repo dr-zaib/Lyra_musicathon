@@ -47,8 +47,14 @@ Most discovery matches the *surface* of music (genre, tempo, audio fingerprint).
 
 ## Demo
 
+- **▶️ Try it yourself here:** _TBD_
 - **Demo video:** _TBD_
-<!-- Once the backend deploy is wired, add:  **App:** https://lyra-green-chi.vercel.app -->
+
+> ⏳ **Heads-up:** the backend runs on a **free-tier instance that sleeps when idle**, so the
+> first journey after a while can take ~30s to wake up (and each turn runs live lyrics
+> analysis, ~5–15s). If it stalls, the app **falls back to a built-in mock so it never dies** —
+> give it a moment, or reload, for the real engine. For the smoothest first impression, open
+> [the backend health check](https://dr-zaib-lyra-backend.hf.space/health) once to warm it up first.
 
 
 ## Architecture
@@ -134,6 +140,7 @@ No Musixmatch content is persisted: lyrics / richsync / analysis are fetched **r
 - **Elevator pitch:** [`docs/PITCH.md`](./docs/PITCH.md)
 - **Product vision & roadmap:** [`docs/VISION.md`](./docs/VISION.md)
 - **How it works (technical):** [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md)
+- **Live app:** _TBD_
 - **Repo:** https://github.com/dr-zaib/Lyra_musicathon
 - **Issues:** https://github.com/dr-zaib/Lyra_musicathon/issues
 - **Demo video:** _TBD_

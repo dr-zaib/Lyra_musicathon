@@ -17,10 +17,15 @@ ENV HOME=/home/user \
 
 WORKDIR /app
 
-# Dependencies first (better layer caching). The backend requirements are complete
-# (torch + sentence-transformers + datapizza + fastapi…), exported from uv.lock.
+# Dependencies first (better layer caching). requirements.txt is exported from uv.lock
+# on a dev machine and pins the CUDA build of torch (nvidia-* + triton, ~5GB) — but this
+# is a CPU Space, so strip the GPU-only deps and pull torch from the CPU wheel index.
 COPY --chown=user backend/requirements.txt /app/backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+RUN grep -ivE '^(nvidia-|triton)' /app/backend/requirements.txt \
+      | sed 's/^torch==2.12.0$/torch==2.12.0+cpu/' \
+      > /app/backend/requirements.cpu.txt \
+ && pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
+      -r /app/backend/requirements.cpu.txt
 
 # Bake the embedding model into the image so cold starts don't pay a ~420MB download.
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-mpnet-base-v2')"
