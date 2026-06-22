@@ -47,7 +47,7 @@ Most discovery matches the *surface* of music (genre, tempo, audio fingerprint).
 
 ## Demo
 
-- **▶️ Try it yourself here:** _TBD_
+- **▶️ Try it yourself here:** https://lyra-green-chi.vercel.app
 - **Demo video:** _TBD_
 
 > ⏳ **Heads-up:** the backend runs on a **free-tier instance that sleeps when idle**, so the
@@ -123,12 +123,12 @@ Then point the frontend at it: `BACKEND_URL=http://localhost:8010` in `web/.env.
 
 Frontend and backend deploy **separately**, each where it fits best:
 
-- **Frontend → Vercel** (native Next.js). Set env `BACKEND_URL` to the backend's public URL, then deploy.
-- **Backend → Replit Reserved VM** (always-on). It loads an ML model (~542 MB) and needs a warm process, so use a **Reserved VM with ≥2 GB RAM — not Autoscale** (scale-to-zero would re-download/re-load the model on every cold start). Config: [`.replit`](./.replit).
-  - Secrets (Replit → Secrets): `MUSIXMATCH_API_KEY`, `ANTHROPIC_API_KEY`.
-  - Run: `cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT`.
+- **Frontend → Vercel** (native Next.js, a Musicathon partner). Set env `BACKEND_URL` to the backend's public URL, then deploy.
+- **Backend → Hugging Face Spaces** (Docker; loads a ~542 MB ML model, so it runs in a warm container).
+  - Live: <https://dr-zaib-lyra-backend.hf.space>
+  - Secrets (Space → Settings → Variables and secrets): `MUSIXMATCH_API_KEY`, `ANTHROPIC_API_KEY`.
 
-Both Vercel and Replit are Musicathon partners.
+> A Replit Reserved VM config ([`.replit`](./.replit)) is also included as an alternative host.
 
 ## Musixmatch compliance
 
@@ -140,7 +140,7 @@ No Musixmatch content is persisted: lyrics / richsync / analysis are fetched **r
 - **Elevator pitch:** [`docs/PITCH.md`](./docs/PITCH.md)
 - **Product vision & roadmap:** [`docs/VISION.md`](./docs/VISION.md)
 - **How it works (technical):** [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md)
-- **Live app:** _TBD_
+- **Live app:** https://lyra-green-chi.vercel.app
 - **Repo:** https://github.com/dr-zaib/Lyra_musicathon
 - **Issues:** https://github.com/dr-zaib/Lyra_musicathon/issues
 - **Demo video:** _TBD_
