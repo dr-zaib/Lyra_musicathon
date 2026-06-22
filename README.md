@@ -48,7 +48,7 @@ Most discovery matches the *surface* of music (genre, tempo, audio fingerprint).
 ## Demo
 
 - **▶️ Try it yourself here:** https://lyra-green-chi.vercel.app
-- **Demo video:** _TBD_
+- **Demo video:** https://drive.google.com/file/d/1KJWUs1_LU7B8MUUtA3382hbX0cIFNZ64/view
 
 > ⏳ **Heads-up:** the backend runs on a **free-tier instance that sleeps when idle**, so the
 > first journey after a while can take ~30s to wake up (and each turn runs live lyrics
@@ -143,7 +143,7 @@ No Musixmatch content is persisted: lyrics / richsync / analysis are fetched **r
 - **Live app:** https://lyra-green-chi.vercel.app
 - **Repo:** https://github.com/dr-zaib/Lyra_musicathon
 - **Issues:** https://github.com/dr-zaib/Lyra_musicathon/issues
-- **Demo video:** _TBD_
+- **Demo video:** https://drive.google.com/file/d/1KJWUs1_LU7B8MUUtA3382hbX0cIFNZ64/view
 
 ## License
 
