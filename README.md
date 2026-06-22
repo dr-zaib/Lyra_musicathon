@@ -147,7 +147,7 @@ No Musixmatch content is persisted: lyrics / richsync / analysis are fetched **r
 
 ## License
 
-**Proprietary — source-available, all rights reserved.** © 2026 Alberto Di Maria and Axel.
+**Proprietary — source-available, all rights reserved.** © 2026 Alberto Di Maria and Zouzoua Axel Israel Ble.
 The source is public so it can be evaluated (Musixmatch Musicathon 2026) and reviewed, but it
 is **not** open source: no use, copying, modification, distribution, or commercial use is
 permitted without the copyright holders' written consent. Commercial rights are reserved to the
