@@ -123,7 +123,7 @@ Then point the frontend at it: `BACKEND_URL=http://localhost:8010` in `web/.env.
 
 Frontend and backend deploy **separately**, each where it fits best:
 
-- **Frontend → Vercel** (native Next.js, a Musicathon partner). Set env `BACKEND_URL` to the backend's public URL, then deploy.
+- **Frontend → Vercel** (native Next.js). Set env `BACKEND_URL` to the backend's public URL, then deploy.
 - **Backend → Hugging Face Spaces** (Docker; loads a ~542 MB ML model, so it runs in a warm container).
   - Live: <https://dr-zaib-lyra-backend.hf.space>
   - Secrets (Space → Settings → Variables and secrets): `MUSIXMATCH_API_KEY`, `ANTHROPIC_API_KEY`.

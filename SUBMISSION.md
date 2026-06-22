@@ -41,7 +41,7 @@ Music discovery today matches the *surface*: genre, tempo, an audio fingerprint.
 - **Emotional engine** — sentence-transformer embeddings (`all-mpnet-base-v2`) place each track on a twelve-node emotion taxonomy (a circumplex of valence × energy); a "journey" is a walk across that space.
 - **Claude (Anthropic)** — reads free-text mood into the emotion model and shapes the trajectory (deepen / evolve / escalate).
 - **Frontend** — Next.js with a `react-three-fiber` 3D compass; mobile compass-first layout plus a desktop split view. Real 30-second previews via Deezer/iTunes, since Musixmatch is lyrics, not audio.
-- **Infra** — frontend on **Vercel** (a Musicathon partner); the backend (FastAPI + ML engine) runs on **Hugging Face Spaces**.
+- **Infra** — frontend on **Vercel**; the backend (FastAPI + ML engine) runs on **Hugging Face Spaces**.
 
 ### A focused MVP — with a real product behind it
 
