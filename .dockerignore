@@ -1,0 +1,14 @@
+# Keep the Docker build context small + safe (HF Spaces backend image).
+web/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/.env
+**/.env.local
+engine/data_test/
+engine/notebook.ipynb
+.git/
+.replit
+archive/
+docs/
+*.md
