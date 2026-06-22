@@ -18,6 +18,14 @@ exclusively to the copyright holders (Alberto Di Maria and Axel). Any commercial
 use, productization, or distribution by anyone else requires their prior written
 agreement.
 
+Exception — Contest grant. By submitting this project to the Musixmatch Musicathon
+2026, the authors grant Musixmatch S.p.A. (Organizer) and Replit, Inc. (Sponsor) the
+license set out in the Contest's Official Rules: a non-exclusive, worldwide,
+royalty-free, perpetual, irrevocable license to use, reproduce, publish, display, and
+distribute the entry (including its source code, name, description, demo, and media)
+for promotional, advertising, PR, and internal evaluation purposes. Nothing in this
+License limits or revokes that grant.
+
 Third-party components are not covered by this license and remain subject to their
 own terms — including, without limitation, the Musixmatch API, Anthropic Claude, and
 the npm and PyPI packages declared in this project's manifests. Lyrics, richsync, and
